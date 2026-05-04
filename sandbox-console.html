@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>价比比沙盒控制台</title>
+<style>
+body{margin:0;background:radial-gradient(circle at top,#fff 0,#f5f5f7 48%,#eee 100%);color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}.app{max-width:920px;margin:0 auto;padding:22px 14px 48px}.tag{display:inline-block;background:#111;color:#fff;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800}.hero{text-align:center;padding:46px 0 26px}.logo{font-size:50px;font-weight:950;letter-spacing:-1.6px;margin:0}.sub{color:#86868b;line-height:1.55;max-width:650px;margin:12px auto 0}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.card{background:rgba(255,255,255,.92);border:1px solid rgba(255,255,255,.86);border-radius:28px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.08);text-decoration:none;color:#1d1d1f;min-height:160px}.card h2{margin:0;font-size:26px;letter-spacing:-.6px}.card p{color:#86868b;line-height:1.5;font-size:14px}.btn{display:inline-block;background:#111;color:#fff;border-radius:999px;padding:10px 14px;font-weight:900;font-size:13px}.btn.blue{background:#007aff}.btn.green{background:#14813f}.btn.orange{background:#ad6800}.status{background:#fff;border-radius:22px;padding:16px;margin-top:14px;color:#6e6e73;line-height:1.55;font-size:13px}.ok{color:#14813f;font-weight:900}.bad{color:#cf1322;font-weight:900}@media(max-width:620px){.grid{grid-template-columns:1fr}.logo{font-size:42px}}
+</style>
+</head>
+<body>
+<div class="app">
+<span class="tag">价比比 · Sandbox Console</span>
+<section class="hero"><h1 class="logo">沙盒控制台</h1><p class="sub">这里统一管理沙盒主流程、候选诊断、自动测试和接口健康检查。沙盒只使用真实接口/真实抓取结果，不返回假商品。</p></section>
+<div class="grid">
+<a class="card" href="./sandbox.html"><h2>沙盒主入口</h2><p>正常体验比价流程：官方/自营、渠道店、普通店三类价格；展示 provider 状态和单位价。</p><span class="btn blue">进入沙盒</span></a>
+<a class="card" href="./sandbox-debug.html"><h2>诊断台</h2><p>查看接口原始候选，逐条显示保留/过滤原因，排查搜不到、搜错、规格错。</p><span class="btn orange">查看诊断</span></a>
+<a class="card" href="./sandbox-tests.html"><h2>自动测试</h2><p>一键跑酸奶、牛奶、百岁山、无糖可乐、纸巾、洗衣液、充电宝、手机壳、PDD 链接等核心用例。</p><span class="btn green">运行测试</span></a>
+<a class="card" href="https://jiabibi-api.onrender.com/health"><h2>API 健康检查</h2><p>检查 Render 后端是否在线、是否跑 server2 爬虫版、拼多多 ps 解析是否启用。</p><span class="btn">检查 API</span></a>
+</div>
+<div class="status" id="status">正在检查后端状态...</div>
+</div>
+<script>
+fetch('https://jiabibi-api.onrender.com/health').then(r=>r.json()).then(d=>{document.getElementById('status').innerHTML='<span class="ok">后端在线</span><br>'+JSON.stringify(d,null,2).replace(/[{}",]/g,' ').slice(0,500)}).catch(e=>{document.getElementById('status').innerHTML='<span class="bad">后端不可用</span><br>'+e.message})
+</script>
+</body>
+</html>
