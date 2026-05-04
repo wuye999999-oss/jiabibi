@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>价比比沙盒自动测试</title>
+<style>
+body{margin:0;background:#f5f5f7;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}.app{max-width:980px;margin:0 auto;padding:18px 14px 44px}.tag{display:inline-block;background:#111;color:#fff;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800}.hero{text-align:center;padding:28px 0 16px}.logo{font-size:42px;font-weight:900;margin:0}.sub{color:#86868b;line-height:1.55}.bar{display:flex;gap:8px;align-items:center;background:#fff;border-radius:22px;padding:12px;box-shadow:0 14px 40px rgba(0,0,0,.06)}button{border:0;border-radius:16px;background:#111;color:#fff;padding:12px 18px;font-weight:800}.muted{color:#86868b;font-size:13px;line-height:1.45}.card{background:#fff;border-radius:22px;padding:16px;margin:12px 0;box-shadow:0 10px 28px rgba(0,0,0,.05)}.row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.name{font-weight:900}.pill{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800}.pass{background:#e8f8ef;color:#14813f}.warn{background:#fff7e6;color:#ad6800}.fail{background:#fff1f0;color:#cf1322}.wait{background:#f2f2f7;color:#777}.small{font-size:12px;color:#999}.reason{font-size:12px;background:#f5f5f7;border-radius:12px;padding:8px;margin-top:8px;color:#555;white-space:pre-wrap}.links a{color:#007aff;text-decoration:none;font-weight:800;margin-right:12px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}.box{text-align:center;border:1px solid #e5e5ea;border-radius:14px;padding:8px}@media(max-width:640px){.grid{grid-template-columns:repeat(2,1fr)}.logo{font-size:36px}.row{display:block}.pill{margin-top:8px}}
+</style>
+</head>
+<body>
+<div class="app">
+<span class="tag">沙盒自动测试 · 真实接口 · 不造假</span>
+<section class="hero"><h1 class="logo">价比比自动测试台</h1><p class="sub">一键跑核心用例，检查接口返回、错品过滤、品牌/品类/属性/规格约束。结果用于开发排查，不代表平台绝对库存。</p></section>
+<div class="bar"><button id="run">运行全部测试</button><div class="muted" id="status">等待运行。</div></div>
+<div class="card links"><a href="./sandbox.html">沙盒页</a><a href="./sandbox-debug.html">诊断台</a><a href="./">首页</a></div>
+<div id="summary" class="card muted">尚未运行。</div>
+<div id="results"></div>
+</div>
+<script>
+const API='https://jiabibi-api.onrender.com';
+const tests=[
+ {name:'酸奶不应混牛奶',q:'酸奶',check:i=>has(i,['酸奶','发酵乳','乳酸菌','酸乳'])&&!has(i,['纯牛奶','鲜牛奶'])},
+ {name:'真零酸奶品牌+品类',q:'真零 酸奶',check:i=>has(i,['真零'])&&has(i,['酸奶','发酵乳','乳酸菌','酸乳'])},
+ {name:'牛奶不应混酸奶',q:'牛奶',check:i=>has(i,['牛奶','牛乳','鲜牛奶','纯牛奶'])&&!has(i,['酸奶','发酵乳'])},
+ {name:'百岁山品牌约束',q:'百岁山',check:i=>has(i,['百岁山','ganten'])},
+ {name:'无糖可口可乐属性约束',q:'无糖可口可乐',check:i=>has(i,['可口可乐','coca','cola'])&&has(i,['无糖','零糖','0糖','零度','zero','0卡','零卡'])},
+ {name:'维达纸巾品牌+品类',q:'维达纸巾',check:i=>has(i,['维达','vinda'])&&has(i,['纸巾','抽纸','卷纸','面巾纸'])},
+ {name:'蓝月亮洗衣液品牌+品类',q:'蓝月亮洗衣液',check:i=>has(i,['蓝月亮'])&&has(i,['洗衣液','洗衣凝珠','洗衣粉'])},
+ {name:'小米20000毫安充电宝品牌+容量',q:'小米充电宝 20000毫安',check:i=>has(i,['小米','xiaomi','redmi','米家'])&&has(i,['充电宝','移动电源'])&&capOk(i,20000)},
+ {name:'苹果15手机壳机型约束',q:'苹果15手机壳',check:i=>has(i,['手机壳','保护壳','硅胶壳'])&&has(i,['iphone15','苹果15','iPhone 15'])},
+ {name:'拼多多 ps 链接解析不乱搜',q:'https://mobile.yangkeduo.com/goods1.html?ps=lluJ0AAw8D',check:i=>i.platform==='pdd'}
+];
+function norm(s){return String(s||'').toLowerCase().replace(/[\s\-_【】\[\]（）()，,。.!！:：/\\]+/g,'')}
+function text(i){return `${i.goods_name||''} ${i.brand_name||''} ${i.shop_name||''} ${(i.unified_tags||[]).join(' ')}`}
+function has(iOrText,arr){const t=typeof iOrText==='string'?iOrText:text(iOrText);const n=norm(t);return arr.some(x=>n.includes(norm(x)))}
+function priceOf(i){return Number(i.coupon_price_yuan||i.min_group_price_yuan||999999)}
+function yuan(n){return Number(n||0).toFixed(2).replace(/\.00$/,'')}
+function capOk(i,target){const m=norm(text(i)).match(/(\d{4,6})(mah|毫安)/);if(!m)return false;return Math.abs(Number(m[1])-target)<=1000}
+function providerHtml(data){const ps=data.providers||[];return '<div class="grid">'+['pdd','jd','tb','douyin'].map(p=>{const st=ps.find(x=>x.platform===p);let txt='暂无';if(st)txt=st.error?'失败':((st.source||'provider')+' '+(st.total_count||0));return `<div class="box"><b>${p}</b><div class="small">${txt}</div></div>`}).join('')+'</div>'}
+function classify(test,data){const list=data.goods_list||[];if(!list.length)return {level:'warn',label:'警告',reason:'接口没有返回候选商品。',bad:[],good:[]};const good=list.filter(test.check);const bad=list.filter(i=>!test.check(i));if(!good.length)return {level:'fail',label:'失败',reason:'接口有候选，但没有任何候选满足测试约束。',bad:bad.slice(0,5),good:[]};if(bad.length)return {level:'warn',label:'警告',reason:`有 ${good.length} 条满足约束，但也有 ${bad.length} 条原始候选不满足。需要看沙盒过滤是否挡住。`,bad:bad.slice(0,5),good:good.slice(0,3)};return {level:'pass',label:'通过',reason:`全部 ${good.length} 条候选满足约束。`,bad:[],good:good.slice(0,3)} }
+async function runOne(test,idx){const box=document.getElementById('results');const id='t'+idx;box.insertAdjacentHTML('beforeend',`<div class="card" id="${id}"><div class="row"><div><div class="name">${test.name}</div><div class="muted">${test.q}</div></div><span class="pill wait">运行中</span></div></div>`);const el=document.getElementById(id);try{const r=await fetch(API+'/api/search?platform=all&page_size=50&sandbox=1&keyword='+encodeURIComponent(test.q));const data=await r.json();const c=classify(test,data);el.innerHTML=`<div class="row"><div><div class="name">${test.name}</div><div class="muted">${test.q}</div></div><span class="pill ${c.level}">${c.label}</span></div><div class="reason">候选 ${data.total_count||0} 条；${c.reason}</div>${providerHtml(data)}${sampleHtml(c.good,'满足样例')}${sampleHtml(c.bad,'问题样例')}`;return c.level}catch(e){el.innerHTML=`<div class="row"><div><div class="name">${test.name}</div><div class="muted">${test.q}</div></div><span class="pill fail">失败</span></div><div class="reason">请求失败：${e.message}</div>`;return 'fail'}}
+function sampleHtml(list,title){if(!list||!list.length)return'';return `<div class="reason"><b>${title}</b>\n`+list.map(i=>`${i.platform} ¥${yuan(priceOf(i))} ${i.goods_name||''}`).join('\n')+'</div>'}
+async function runAll(){document.getElementById('results').innerHTML='';document.getElementById('status').textContent='运行中...';let pass=0,warn=0,fail=0;for(let i=0;i<tests.length;i++){const level=await runOne(tests[i],i);if(level==='pass')pass++;else if(level==='warn')warn++;else fail++}document.getElementById('summary').innerHTML=`测试完成：通过 ${pass}，警告 ${warn}，失败 ${fail}。<br>警告通常表示接口原始候选里有杂项，但主沙盒过滤可能已挡住；失败需要优先修。`;document.getElementById('status').textContent='测试完成。'}
+document.getElementById('run').onclick=runAll;runAll();
+</script>
+</body>
+</html>
