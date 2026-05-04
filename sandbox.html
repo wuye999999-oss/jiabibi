@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>价比比沙盒</title>
+<style>
+body{margin:0;background:#f5f5f7;color:#1d1d1f;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}.app{max-width:920px;margin:0 auto;padding:18px 14px 40px}.tag{display:inline-block;background:#111;color:#fff;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800}.hero{text-align:center;padding:34px 0 18px}.logo{font-size:48px;font-weight:900;letter-spacing:-1px;margin:0}.sub{color:#86868b;line-height:1.55}.search{display:flex;gap:8px;background:#fff;border-radius:24px;padding:10px;box-shadow:0 18px 60px rgba(0,0,0,.08)}input{flex:1;border:1px solid #e5e5ea;border-radius:17px;padding:14px;font-size:16px}button{border:0;border-radius:17px;background:#111;color:#fff;padding:0 18px;font-weight:800}.chips{display:flex;gap:8px;overflow:auto;padding:12px 0}.chip{background:#fff;color:#555;border-radius:999px;padding:8px 12px;white-space:nowrap}.status{color:#86868b;text-align:center;padding:12px}.card{background:#fff;border-radius:24px;padding:18px;margin:12px 0;box-shadow:0 12px 34px rgba(0,0,0,.06)}.row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.price{font-size:36px;font-weight:900}.muted{color:#86868b;font-size:13px;line-height:1.45}.pill{background:#f2f2f7;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800}.platforms{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}.p{border:1px solid #e5e5ea;border-radius:14px;padding:9px;text-align:center}.empty{color:#b0b0b5;font-size:12px}.note{background:#fff;border-radius:20px;padding:14px;margin-top:14px;color:#6e6e73;line-height:1.55;font-size:13px}@media(max-width:520px){.platforms{grid-template-columns:repeat(2,1fr)}.logo{font-size:42px}}
+</style>
+</head>
+<body>
+<div class="app">
+<span class="tag">沙盒环境 · 真实接口 · 不返回假商品</span>
+<section class="hero"><h1 class="logo">价比比</h1><p class="sub">沙盒版用于验证真实接口、链接解析和三类价格展示。拼多多/京东走真实接口；淘宝/抖音未接入时只显示待接入。</p></section>
+<form id="form" class="search"><input id="kw" value="酸奶" placeholder="输入商品名或粘贴商品链接"><button>比价</button></form>
+<div id="chips" class="chips"></div>
+<div id="status" class="status">准备好了。</div>
+<div id="result"></div>
+<div class="note">沙盒说明：优先展示真实返回数据；未返回不造假。拼多多短分享链接会交给后端解析；解析不到时会提示复制标题搜索。</div>
+</div>
+<script>
+const API='https://jiabibi-api.onrender.com';
+const platforms=[['pdd','拼多多'],['jd','京东'],['tb','淘宝'],['douyin','抖音']];
+const groups=[['official','官方/自营最低价'],['channel','渠道店最低价'],['normal','普通店最低价']];
+const hot=['酸奶','真零 酸奶','牛奶','百岁山','无糖可口可乐','维达纸巾','小米充电宝 20000毫安'];
+const yuan=n=>Number(n||0).toFixed(2).replace(/\.00$/,'');
+const priceOf=i=>Number(i.coupon_price_yuan||i.min_group_price_yuan||999999);
+const text=i=>`${i.goods_name||''} ${i.brand_name||''} ${i.shop_name||''} ${(i.unified_tags||[]).join(' ')}`;
+const has=(s,arr)=>arr.some(x=>String(s).includes(x));
+const official=['官方旗舰店','品牌旗舰店','旗舰店','官方店','京东自营','自营'];
+const channel=['渠道','批发','厂家','工厂','源头','尾货','清仓','仓库','量贩','整箱批发','团购'];
+function typeOf(i){const t=text(i); if(has(t,official)) return 'official'; if(has(t,channel)) return 'channel'; return 'normal'}
+function spec(i){const t=text(i).replace(/[×ＸxX]/g,'*').replace(/毫升/g,'ml');const p=priceOf(i);let m=t.match(/(\d+(?:\.\d+)?)\s*(ml|mL|ML|l|L|升)\s*[*]?\s*(\d+)?\s*(瓶|罐|听|盒)?/);if(m){let ml=Number(m[1])*(String(m[2]).toLowerCase()==='l'||m[2]==='升'?1000:1);let c=Number(m[3]||1);return `${ml}ml × ${c}${m[4]||'件'} ｜ 约 ¥${yuan(p/(ml*c/100))}/100ml`}m=t.match(/(\d+(?:\.\d+)?)\s*(kg|公斤|斤|g|G|克)/);if(m){let kg=Number(m[1]);if(m[2]==='斤')kg*=0.5;if(['g','G','克'].includes(m[2]))kg/=1000;return `${yuan(kg)}kg ｜ 约 ¥${yuan(p/kg)}/kg`}return ''}
+function best(list,type,platform){return list.filter(x=>x.platform===platform&&typeOf(x)===type).sort((a,b)=>priceOf(a)-priceOf(b))[0]}
+function bestAll(list,type){return platforms.map(([p])=>best(list,type,p)).filter(Boolean).sort((a,b)=>priceOf(a)-priceOf(b))[0]}
+function render(data){const list=data.goods_list||[];const r=document.getElementById('result');r.innerHTML='';if(!list.length){r.innerHTML='<div class="card muted">没有返回真实商品。请换商品标题或检查接口状态。</div>';return}for(const [type,title] of groups){const item=bestAll(list,type);let html='<div class="card"><div class="row"><div><div class="muted">'+title+'</div>';if(item){const pf=platforms.find(x=>x[0]===item.platform)?.[1]||item.platform;html+='<div class="price">¥'+yuan(priceOf(item))+'</div><div class="muted">'+pf+' · '+(item.shop_name||item.brand_name||'')+'<br>'+item.goods_name+'</div>';const sp=spec(item);if(sp)html+='<div class="muted">'+sp+'</div>'}else{html+='<div class="price">¥--</div><div class="muted">未返回该类型商品。</div>'}html+='</div><span class="pill">'+(item?item.platform:'暂无')+'</span></div><div class="platforms">';for(const [p,name] of platforms){const x=best(list,type,p);html+='<div class="p"><div class="muted">'+name+'</div>'+(x?'<b>¥'+yuan(priceOf(x))+'</b>':'<div class="empty">待接入/暂无</div>')+'</div>'}html+='</div></div>';r.insertAdjacentHTML('beforeend',html)}}
+async function search(v){const kw=(v||document.getElementById('kw').value||'').trim();document.getElementById('kw').value=kw;document.getElementById('status').textContent='沙盒真实接口查询中...';document.getElementById('result').innerHTML='<div class="card muted">加载中...</div>';try{const res=await fetch(API+'/api/search?platform=all&page_size=50&sandbox=1&keyword='+encodeURIComponent(kw));const data=await res.json();document.getElementById('status').textContent='沙盒返回：'+(data.keyword||kw)+'，候选 '+(data.total_count||0)+' 条';render(data)}catch(e){document.getElementById('status').textContent='查询失败';document.getElementById('result').innerHTML='<div class="card muted">'+e.message+'</div>'}}
+document.getElementById('form').onsubmit=e=>{e.preventDefault();search()};hot.forEach(w=>{const b=document.createElement('button');b.type='button';b.className='chip';b.textContent=w;b.onclick=()=>search(w);document.getElementById('chips').appendChild(b)});search('酸奶');
+</script>
+</body>
+</html>
