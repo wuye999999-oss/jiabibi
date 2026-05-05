@@ -35,9 +35,9 @@
     if(!q||/^https?:\/\//i.test(q))return;
     if(tbDone.has(q))return; tbDone.add(q);
     try{
-      const res=await fetch(API+'/api/tb/search?q='+encodeURIComponent(q),{cache:'no-store'});
+      const res=await fetch(API+'/api/tb/real-search?q='+encodeURIComponent(q),{cache:'no-store'});
       const tb=await res.json();
-      console.log('[v16] 淘宝搜索返回',tb);
+      console.log('[v16] 淘宝真实搜索返回',tb);
       const merged=mergeTb(data||{},tb||{},q);
       renderFn(merged,q);
       setTimeout(stableUi,0);
