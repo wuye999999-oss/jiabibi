@@ -34,6 +34,7 @@ public class MainActivity extends Activity {
     private String lastPageTitle = "";
     private String lastDiag = "";
 
+    private static final String DEFAULT_QUERY = "小米充电宝";
     private static final String DEFAULT_URL = "https://m.jd.com/";
 
     @SuppressLint({"SetJavaScriptEnabled", "AddJavascriptInterface"})
@@ -46,58 +47,44 @@ public class MainActivity extends Activity {
         root.setPadding(20, 18, 20, 18);
 
         TextView title = new TextView(this);
-        title.setText("价比比 · 真实账号沙盒 v3");
-        title.setTextSize(20);
+        title.setText("价比比沙盒");
+        title.setTextSize(22);
         title.setGravity(Gravity.CENTER_VERTICAL);
+        title.setOnLongClickListener(v -> { clearLoginState(); return true; });
         root.addView(title, new LinearLayout.LayoutParams(-1, -2));
 
         input = new EditText(this);
         input.setSingleLine(true);
-        input.setHint("粘贴商品链接，或输入关键词");
-        input.setText(DEFAULT_URL);
+        input.setHint("输入关键词，或粘贴商品链接");
+        input.setText(DEFAULT_QUERY);
         root.addView(input, new LinearLayout.LayoutParams(-1, -2));
 
-        LinearLayout platformButtons = new LinearLayout(this);
-        platformButtons.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout platforms = new LinearLayout(this);
+        platforms.setOrientation(LinearLayout.HORIZONTAL);
         Button tb = makeButton("淘宝");
         Button jd = makeButton("京东");
         Button pdd = makeButton("拼多多");
-        platformButtons.addView(tb, new LinearLayout.LayoutParams(0, -2, 1));
-        platformButtons.addView(jd, new LinearLayout.LayoutParams(0, -2, 1));
-        platformButtons.addView(pdd, new LinearLayout.LayoutParams(0, -2, 1));
-        root.addView(platformButtons, new LinearLayout.LayoutParams(-1, -2));
+        platforms.addView(tb, new LinearLayout.LayoutParams(0, -2, 1));
+        platforms.addView(jd, new LinearLayout.LayoutParams(0, -2, 1));
+        platforms.addView(pdd, new LinearLayout.LayoutParams(0, -2, 1));
+        root.addView(platforms, new LinearLayout.LayoutParams(-1, -2));
 
-        LinearLayout row1 = new LinearLayout(this);
-        row1.setOrientation(LinearLayout.HORIZONTAL);
-        Button open = makeButton("打开");
-        Button back = makeButton("返回");
-        Button capture = makeButton("读取价格");
-        Button quickDiag = makeButton("诊断页面");
-        row1.addView(open, new LinearLayout.LayoutParams(0, -2, 1));
-        row1.addView(back, new LinearLayout.LayoutParams(0, -2, 1));
-        row1.addView(capture, new LinearLayout.LayoutParams(0, -2, 1));
-        row1.addView(quickDiag, new LinearLayout.LayoutParams(0, -2, 1));
-        root.addView(row1, new LinearLayout.LayoutParams(-1, -2));
-
-        LinearLayout row2 = new LinearLayout(this);
-        row2.setOrientation(LinearLayout.HORIZONTAL);
-        Button copy = makeButton("复制诊断");
-        Button copyJson = makeButton("复制JSON");
-        Button clearResults = makeButton("清结果");
-        Button clearLogin = makeButton("清登录态");
-        row2.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
-        row2.addView(copyJson, new LinearLayout.LayoutParams(0, -2, 1));
-        row2.addView(clearResults, new LinearLayout.LayoutParams(0, -2, 1));
-        row2.addView(clearLogin, new LinearLayout.LayoutParams(0, -2, 1));
-        root.addView(row2, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        Button read = makeButton("读取价格");
+        Button copy = makeButton("复制结果");
+        actions.addView(read, new LinearLayout.LayoutParams(0, -2, 1));
+        actions.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        root.addView(actions, new LinearLayout.LayoutParams(-1, -2));
 
         result = new TextView(this);
-        result.setText("说明：账号只在本机 WebView 登录；价比比不保存账号密码、不上传 cookie。先点平台按钮或粘贴商品链接，登录后进商品页，再点读取价格。\n\nv3：平台专用价格选择器、规格/券后价/图片识别、页面诊断、JSON导出、返回按钮。");
+        result.setText("三步：选平台 → 登录/进商品页 → 读取价格。\n账号只在本机登录，不上传 cookie。\n长按：标题清登录态；读取=诊断；复制=JSON。\n");
         result.setTextSize(13);
         result.setPadding(0, 8, 0, 8);
+        result.setOnLongClickListener(v -> { clearResults(); return true; });
         ScrollView resultBox = new ScrollView(this);
         resultBox.addView(result);
-        root.addView(resultBox, new LinearLayout.LayoutParams(-1, 260));
+        root.addView(resultBox, new LinearLayout.LayoutParams(-1, 175));
 
         webView = new WebView(this);
         WebSettings s = webView.getSettings();
@@ -108,7 +95,7 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setSupportZoom(true);
         s.setBuiltInZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " JiabibiRealSandbox/0.3");
+        s.setUserAgentString(s.getUserAgentString() + " JiabibiRealSandbox/0.4");
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -116,7 +103,7 @@ public class MainActivity extends Activity {
                 lastUrl = url == null ? "" : url;
                 lastPlatform = detectPlatform(lastUrl);
                 lastPageTitle = view == null ? "" : String.valueOf(view.getTitle());
-                runOnUiThread(() -> updateStatus("页面已加载：" + lastPlatform + "\n标题：" + lastPageTitle + "\n" + lastUrl + "\n\n登录后进入商品详情页，点“读取价格”。读不到时点“诊断页面”。"));
+                runOnUiThread(() -> updateStatus("已打开：" + lastPlatform + "\n" + shortText(lastPageTitle, 38) + "\n进商品页后点“读取价格”。"));
             }
         });
         webView.setWebChromeClient(new WebChromeClient());
@@ -128,16 +115,18 @@ public class MainActivity extends Activity {
         tb.setOnClickListener(v -> openPlatform("tb"));
         jd.setOnClickListener(v -> openPlatform("jd"));
         pdd.setOnClickListener(v -> openPlatform("pdd"));
-        open.setOnClickListener(v -> openUrl());
-        back.setOnClickListener(v -> goBack());
-        capture.setOnClickListener(v -> capturePrice());
-        quickDiag.setOnClickListener(v -> diagnosePage());
-        copy.setOnClickListener(v -> copyDiagnostics());
-        copyJson.setOnClickListener(v -> copyJson());
-        clearResults.setOnClickListener(v -> clearResults());
-        clearLogin.setOnClickListener(v -> clearLoginState());
+        read.setOnClickListener(v -> capturePrice());
+        read.setOnLongClickListener(v -> { diagnosePage(); return true; });
+        copy.setOnClickListener(v -> copyResult());
+        copy.setOnLongClickListener(v -> { copyJson(); return true; });
 
-        openUrl();
+        webView.loadUrl(DEFAULT_URL);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (webView != null && webView.canGoBack()) webView.goBack();
+        else super.onBackPressed();
     }
 
     private Button makeButton(String text) {
@@ -150,49 +139,27 @@ public class MainActivity extends Activity {
     private void openPlatform(String platform) {
         String q = input.getText().toString().trim();
         if (q.startsWith("http://") || q.startsWith("https://")) {
-            openUrl();
+            openUrl(q);
             return;
         }
-        if (q.length() == 0) q = "小米充电宝";
+        if (q.length() == 0) q = DEFAULT_QUERY;
         try {
             String e = URLEncoder.encode(q, "UTF-8");
             String url;
-            if ("tb".equals(platform)) {
-                url = "https://s.m.taobao.com/h5?q=" + e;
-            } else if ("pdd".equals(platform)) {
-                url = "https://mobile.yangkeduo.com/search_result.html?search_key=" + e;
-            } else {
-                url = "https://m.jd.com/ware/search.action?keyword=" + e;
-            }
-            input.setText(url);
-            openUrl();
+            if ("tb".equals(platform)) url = "https://s.m.taobao.com/h5?q=" + e;
+            else if ("pdd".equals(platform)) url = "https://mobile.yangkeduo.com/search_result.html?search_key=" + e;
+            else url = "https://m.jd.com/ware/search.action?keyword=" + e;
+            openUrl(url);
         } catch (Exception ex) {
-            updateStatus("打开平台失败：" + ex.getMessage());
+            updateStatus("打开失败：" + ex.getMessage());
         }
     }
 
-    private void openUrl() {
-        String url = input.getText().toString().trim();
-        if (url.length() == 0) url = DEFAULT_URL;
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            try {
-                url = "https://m.jd.com/ware/search.action?keyword=" + URLEncoder.encode(url, "UTF-8");
-            } catch (Exception ignored) {
-                url = DEFAULT_URL;
-            }
-        }
+    private void openUrl(String url) {
         lastUrl = url;
         lastPlatform = detectPlatform(url);
-        updateStatus("正在打开：" + lastPlatform + "\n" + url + "\n\n进入商品详情页并登录后，点“读取价格”。");
+        updateStatus("正在打开：" + lastPlatform + "\n" + shortText(url, 80));
         webView.loadUrl(url);
-    }
-
-    private void goBack() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
-        } else {
-            updateStatus("没有可返回的页面。\n当前：" + lastUrl);
-        }
     }
 
     private String detectPlatform(String url) {
@@ -203,25 +170,27 @@ public class MainActivity extends Activity {
         return "unknown";
     }
 
+    private String shortText(String s, int n) {
+        if (s == null) return "";
+        s = s.replace("\n", " ").trim();
+        return s.length() > n ? s.substring(0, n) + "…" : s;
+    }
+
     private void updateStatus(String text) {
         result.setText(text + "\n\n" + renderCaptures());
     }
 
     private String renderCaptures() {
-        if (captures.length() == 0) return "已读取结果：暂无";
-        StringBuilder sb = new StringBuilder("已读取结果：\n");
+        if (captures.length() == 0) return "结果：暂无";
+        StringBuilder sb = new StringBuilder("结果：");
         for (int i = 0; i < captures.length(); i++) {
             JSONObject o = captures.optJSONObject(i);
             if (o == null) continue;
-            sb.append("\n【").append(i + 1).append("】")
-                    .append(o.optString("platform"))
-                    .append("\n标题：").append(o.optString("title"))
-                    .append("\n价格：").append(o.optString("price"))
-                    .append("\n券后/活动：").append(o.optString("promoPrice"))
-                    .append("\n规格：").append(o.optString("spec"))
-                    .append("\n店铺：").append(o.optString("shop"))
-                    .append("\n链接：").append(o.optString("url"))
-                    .append("\n");
+            sb.append("\n\n").append(i + 1).append(". ").append(o.optString("platform"))
+                    .append("  ").append(o.optString("price"));
+            String promo = o.optString("promoPrice");
+            if (promo.length() > 0) sb.append("\n券后/活动：").append(shortText(promo, 40));
+            sb.append("\n").append(shortText(o.optString("title"), 56));
         }
         return sb.toString();
     }
@@ -250,25 +219,20 @@ public class MainActivity extends Activity {
                 "var spec=pick(['[class*=sku]','[class*=Sku]','[class*=spec]','[class*=Spec]','[class*=selected]']);" +
                 "var shop=pick(['.shop-name','.seller-name','.shop-title','.mall-name','.store-name','[class*=shop]','[class*=Shop]','[class*=seller]','[class*=Seller]']);" +
                 "var image=pickAttr(['meta[property=\\\"og:image\\\"]'],'content')||pickAttr(['img'],'src');" +
-                "var diag={platform:platform,host:host,href:location.href,titleText:document.title,bodyLength:body.length,priceNodeCount:document.querySelectorAll('[class*=price],[class*=Price]').length,imgCount:document.images.length,buttonCount:document.querySelectorAll('button').length,sample:body.slice(0,900)};" +
+                "var diag={platform:platform,host:host,href:location.href,titleText:document.title,bodyLength:body.length,priceNodeCount:document.querySelectorAll('[class*=price],[class*=Price]').length,imgCount:document.images.length,sample:body.slice(0,900)};" +
                 "var data={platform:platform,host:host,title:title,price:price,promoPrice:promo,spec:spec,shop:shop,image:image,url:location.href,time:new Date().toISOString(),ua:navigator.userAgent,diagnoseOnly:" + diagnoseOnly + ",diag:diag};" +
                 "JiabibiBridge.onCapture(JSON.stringify(data));" +
                 "})();";
     }
 
-    private void capturePrice() {
-        webView.evaluateJavascript(captureScript(false), null);
-    }
-
-    private void diagnosePage() {
-        webView.evaluateJavascript(captureScript(true), null);
-    }
+    private void capturePrice() { webView.evaluateJavascript(captureScript(false), null); }
+    private void diagnosePage() { webView.evaluateJavascript(captureScript(true), null); }
 
     private JSONObject buildExportObject() {
         JSONObject out = new JSONObject();
         try {
             out.put("app", "jiabibi-real-sandbox");
-            out.put("version", "v3");
+            out.put("version", "simple-v4");
             out.put("lastPlatform", lastPlatform);
             out.put("lastUrl", lastUrl);
             out.put("lastPageTitle", lastPageTitle);
@@ -278,16 +242,16 @@ public class MainActivity extends Activity {
         return out;
     }
 
-    private void copyDiagnostics() {
-        String text = "价比比真实账号沙盒 v3\n当前平台：" + lastPlatform + "\n当前标题：" + lastPageTitle + "\n当前链接：" + lastUrl + "\n\n最近诊断：\n" + lastDiag + "\n\n" + renderCaptures();
-        copyText("jiabibi-diagnostics", text);
-        updateStatus("诊断信息已复制。\n\n" + text);
+    private void copyResult() {
+        String text = "价比比读取结果\n" + renderCaptures() + "\n\n当前链接：" + lastUrl;
+        copyText("jiabibi-result", text);
+        updateStatus("已复制结果。\n\n" + renderCaptures());
     }
 
     private void copyJson() {
         String text = buildExportObject().toString();
         copyText("jiabibi-json", text);
-        updateStatus("JSON 已复制。\n\n" + text);
+        updateStatus("已复制完整 JSON。\n\n" + renderCaptures());
     }
 
     private void copyText(String label, String text) {
@@ -298,7 +262,7 @@ public class MainActivity extends Activity {
     private void clearResults() {
         while (captures.length() > 0) captures.remove(0);
         lastDiag = "";
-        updateStatus("已清空读取结果。登录态未清除。\n当前页面：" + lastUrl);
+        updateStatus("已清空结果。登录态还在。\n进商品页后点读取价格。");
     }
 
     private void clearLoginState() {
@@ -308,7 +272,7 @@ public class MainActivity extends Activity {
             webView.clearHistory();
             while (captures.length() > 0) captures.remove(0);
             lastDiag = "";
-            updateStatus("已清除本机 WebView Cookie / 缓存 / 历史。\n账号会退出，需要重新登录。");
+            updateStatus("已清除登录态。需要重新登录。\n输入关键词后点平台按钮继续。");
             webView.loadUrl(DEFAULT_URL);
         }));
         cm.flush();
@@ -324,13 +288,10 @@ public class MainActivity extends Activity {
                     lastDiag = diag == null ? "" : diag.toString();
                     boolean diagnoseOnly = o.optBoolean("diagnoseOnly", false);
                     if (!diagnoseOnly) captures.put(o);
-                    if (diagnoseOnly) {
-                        updateStatus("页面诊断完成：\n平台：" + o.optString("platform") + "\n价格节点数：" + (diag == null ? "" : diag.optString("priceNodeCount")) + "\n图片数：" + (diag == null ? "" : diag.optString("imgCount")) + "\n正文长度：" + (diag == null ? "" : diag.optString("bodyLength")) + "\n\n如果读不到价格，点“复制诊断”发我继续修选择器。");
-                    } else {
-                        updateStatus("读取成功：" + o.optString("platform") + "\n价格：" + o.optString("price") + "\n券后/活动：" + o.optString("promoPrice") + "\n规格：" + o.optString("spec") + "\n\n下一步：切到另一个平台，进入同类商品页继续读取。最后点“复制JSON”。");
-                    }
+                    if (diagnoseOnly) updateStatus("诊断完成，已记录。长按“复制结果”可复制完整 JSON。\n价格节点：" + (diag == null ? "" : diag.optString("priceNodeCount")));
+                    else updateStatus("读取成功：" + o.optString("platform") + "  " + o.optString("price") + "\n继续切平台读取，最后点复制结果。");
                 } catch (Exception e) {
-                    updateStatus("读取失败：" + e.getMessage() + "\n原始：" + json);
+                    updateStatus("读取失败：" + e.getMessage());
                 }
             });
         }
