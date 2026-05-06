@@ -23,6 +23,8 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.net.URLEncoder;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MainActivity extends Activity {
     private WebView webView;
@@ -78,13 +80,13 @@ public class MainActivity extends Activity {
         root.addView(actions, new LinearLayout.LayoutParams(-1, -2));
 
         result = new TextView(this);
-        result.setText("三步：选平台 → 登录/进商品页 → 读取价格。\n账号只在本机登录，不上传 cookie。\n长按：标题清登录态；读取=诊断；复制=JSON。\n");
+        result.setText("第一性原理：只读用户本机真实页面。\n三步：选平台 → 进商品页 → 读取价格。\n长按：标题清登录态；读取=诊断；复制=JSON。\n");
         result.setTextSize(13);
         result.setPadding(0, 8, 0, 8);
         result.setOnLongClickListener(v -> { clearResults(); return true; });
         ScrollView resultBox = new ScrollView(this);
         resultBox.addView(result);
-        root.addView(resultBox, new LinearLayout.LayoutParams(-1, 175));
+        root.addView(resultBox, new LinearLayout.LayoutParams(-1, 185));
 
         webView = new WebView(this);
         WebSettings s = webView.getSettings();
@@ -103,7 +105,7 @@ public class MainActivity extends Activity {
                 lastUrl = url == null ? "" : url;
                 lastPlatform = detectPlatform(lastUrl);
                 lastPageTitle = view == null ? "" : String.valueOf(view.getTitle());
-                runOnUiThread(() -> updateStatus("已打开：" + lastPlatform + "\n" + shortText(lastPageTitle, 38) + "\n进商品页后点“读取价格”。"));
+                runOnUiThread(() -> updateStatus("已打开：" + platformName(lastPlatform) + "\n" + shortText(lastPageTitle, 40) + "\n进商品页后点“读取价格”。"));
             }
         });
         webView.setWebChromeClient(new WebChromeClient());
@@ -158,7 +160,7 @@ public class MainActivity extends Activity {
     private void openUrl(String url) {
         lastUrl = url;
         lastPlatform = detectPlatform(url);
-        updateStatus("正在打开：" + lastPlatform + "\n" + shortText(url, 80));
+        updateStatus("正在打开：" + platformName(lastPlatform) + "\n" + shortText(url, 84));
         webView.loadUrl(url);
     }
 
@@ -168,6 +170,13 @@ public class MainActivity extends Activity {
         if (u.contains("jd.com") || u.contains("3.cn")) return "jd";
         if (u.contains("pinduoduo") || u.contains("yangkeduo") || u.contains("pdd")) return "pdd";
         return "unknown";
+    }
+
+    private String platformName(String p) {
+        if ("taobao".equals(p)) return "淘宝";
+        if ("jd".equals(p)) return "京东";
+        if ("pdd".equals(p)) return "拼多多";
+        return "未知平台";
     }
 
     private String shortText(String s, int n) {
@@ -182,17 +191,71 @@ public class MainActivity extends Activity {
 
     private String renderCaptures() {
         if (captures.length() == 0) return "结果：暂无";
-        StringBuilder sb = new StringBuilder("结果：");
+        JSONObject best = bestCapture();
+        StringBuilder sb = new StringBuilder();
+        if (best != null) {
+            sb.append("最便宜：").append(platformName(best.optString("platform")))
+                    .append("  ¥").append(formatPrice(best.optDouble("priceNumber", 0)))
+                    .append("\n").append(shortText(best.optString("title"), 58));
+        }
+        sb.append("\n\n已读取 ").append(captures.length()).append(" 个平台：");
         for (int i = 0; i < captures.length(); i++) {
             JSONObject o = captures.optJSONObject(i);
             if (o == null) continue;
-            sb.append("\n\n").append(i + 1).append(". ").append(o.optString("platform"))
-                    .append("  ").append(o.optString("price"));
+            double n = o.optDouble("priceNumber", 0);
+            sb.append("\n").append(i + 1).append(". ").append(platformName(o.optString("platform")))
+                    .append("  ").append(n > 0 ? "¥" + formatPrice(n) : shortText(o.optString("price"), 28));
             String promo = o.optString("promoPrice");
-            if (promo.length() > 0) sb.append("\n券后/活动：").append(shortText(promo, 40));
-            sb.append("\n").append(shortText(o.optString("title"), 56));
+            if (promo.length() > 0) sb.append("\n   活动：").append(shortText(promo, 42));
+            sb.append("\n   ").append(shortText(o.optString("title"), 56));
         }
         return sb.toString();
+    }
+
+    private JSONObject bestCapture() {
+        JSONObject best = null;
+        double bestPrice = Double.MAX_VALUE;
+        for (int i = 0; i < captures.length(); i++) {
+            JSONObject o = captures.optJSONObject(i);
+            if (o == null) continue;
+            double n = o.optDouble("priceNumber", 0);
+            if (n > 0 && n < bestPrice) {
+                bestPrice = n;
+                best = o;
+            }
+        }
+        return best;
+    }
+
+    private String formatPrice(double n) {
+        if (Math.abs(n - Math.round(n)) < 0.001) return String.valueOf((long)Math.round(n));
+        return String.format(java.util.Locale.US, "%.2f", n);
+    }
+
+    private double extractLowestPrice(String text) {
+        if (text == null) return 0;
+        Matcher m = Pattern.compile("([0-9]+(?:\\.[0-9]{1,2})?)").matcher(text);
+        double best = Double.MAX_VALUE;
+        while (m.find()) {
+            try {
+                double v = Double.parseDouble(m.group(1));
+                if (v > 0.01 && v < best) best = v;
+            } catch (Exception ignored) {}
+        }
+        return best == Double.MAX_VALUE ? 0 : best;
+    }
+
+    private void upsertCapture(JSONObject o) {
+        String p = o.optString("platform");
+        double a = extractLowestPrice(o.optString("promoPrice"));
+        double b = extractLowestPrice(o.optString("price"));
+        double priceNumber = a > 0 ? a : b;
+        try { o.put("priceNumber", priceNumber); } catch (Exception ignored) {}
+        for (int i = captures.length() - 1; i >= 0; i--) {
+            JSONObject old = captures.optJSONObject(i);
+            if (old != null && p.equals(old.optString("platform"))) captures.remove(i);
+        }
+        captures.put(o);
     }
 
     private String captureScript(boolean diagnoseOnly) {
@@ -232,11 +295,13 @@ public class MainActivity extends Activity {
         JSONObject out = new JSONObject();
         try {
             out.put("app", "jiabibi-real-sandbox");
-            out.put("version", "simple-v4");
+            out.put("version", "v4-first-principles");
+            out.put("principle", "only observed page facts from local WebView; no fake price; no cookie upload");
             out.put("lastPlatform", lastPlatform);
             out.put("lastUrl", lastUrl);
             out.put("lastPageTitle", lastPageTitle);
             out.put("lastDiag", lastDiag);
+            out.put("best", bestCapture());
             out.put("captures", captures);
         } catch (Exception ignored) {}
         return out;
@@ -287,9 +352,9 @@ public class MainActivity extends Activity {
                     JSONObject diag = o.optJSONObject("diag");
                     lastDiag = diag == null ? "" : diag.toString();
                     boolean diagnoseOnly = o.optBoolean("diagnoseOnly", false);
-                    if (!diagnoseOnly) captures.put(o);
-                    if (diagnoseOnly) updateStatus("诊断完成，已记录。长按“复制结果”可复制完整 JSON。\n价格节点：" + (diag == null ? "" : diag.optString("priceNodeCount")));
-                    else updateStatus("读取成功：" + o.optString("platform") + "  " + o.optString("price") + "\n继续切平台读取，最后点复制结果。");
+                    if (!diagnoseOnly) upsertCapture(o);
+                    if (diagnoseOnly) updateStatus("诊断完成。长按“复制结果”复制 JSON。\n价格节点：" + (diag == null ? "" : diag.optString("priceNodeCount")));
+                    else updateStatus("读取成功：" + platformName(o.optString("platform")) + "  " + o.optString("price") + "\n继续切平台读取，最后点复制结果。");
                 } catch (Exception e) {
                     updateStatus("读取失败：" + e.getMessage());
                 }
