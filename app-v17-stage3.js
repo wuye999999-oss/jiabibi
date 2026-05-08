@@ -15,7 +15,7 @@
   function textOf(i){return [i.goods_name,i.goods_desc,i.brand_name,i.shop_name,(i.unified_tags||[]).join(' ')].filter(Boolean).join(' ')}
   function hasAny(t,arr){return arr.some(w=>String(t||'').includes(w))}
   function kindOf(i){const t=textOf(i); if(hasAny(t,officialWords))return'official'; if(hasAny(t,channelWords))return'channel'; return'normal'}
-  function itemId(i){return [i.platform,i.goods_sign||i.sku_id||i.num_iid||i.goods_id||i.item_id||i.material_url||i.goods_name].join(':')}
+  function itemId(i){return [i.platform,i.goods_sign||i.sku_id||i.num_iid||i.goods_id||i.item_id||i.material_url||i.url||i.goods_name].join(':')}
   function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
   function image(i){return i.goods_thumbnail_url||i.goods_image_url||i.image||''}
   function pName(p){return providers[p]||p||'未知'}
@@ -34,7 +34,7 @@
       localStorage.setItem('selectedPlatforms',JSON.stringify(debug?['pdd','jd','tb','douyin']:ACTIVE));
     }catch(e){}
     const tag=document.querySelector('.tag'); if(tag)tag.textContent='价比比 · 第三阶段 · 拼多多 vs 淘宝';
-    const sub=document.querySelector('.sub'); if(sub)sub.textContent='先不管京东，当前只对比拼多多和淘宝：同关键词、同品类、同规格，错品宁可过滤。';
+    const sub=document.querySelector('.sub'); if(sub)sub.textContent='只对比拼多多和淘宝：看真实价格，点去购买直接跳平台。';
   }
   function activeOnlyGoods(goods){return (Array.isArray(goods)?goods:[]).filter(x=>ACTIVE.includes(x.platform));}
   function activeOnlyProviders(list){return (Array.isArray(list)?list:[]).filter(x=>ACTIVE.includes(x.platform));}
@@ -42,7 +42,7 @@
     const arr=activeOnlyProviders(list);
     const seen=new Set(arr.map(x=>x.platform));
     for(const p of ACTIVE) if(!seen.has(p)) arr.push({platform:p,ok:false,total_count:0,message:'暂无状态'});
-    return `<div class="card"><b>平台状态：拼多多 vs 淘宝</b><div class="grid" style="margin-top:10px;grid-template-columns:repeat(2,1fr)">${arr.map(p=>`<div class="p"><b>${esc(pName(p.platform))}</b><div class="muted">${p.ok?'已返回':'待确认'}｜${Number(p.total_count||0)} 个</div><div class="muted">${esc(p.source||p.coverage||p.message||'')}</div></div>`).join('')}</div><div class="muted" style="margin-top:8px">京东搜索词/权限没下来前不参与顾客端对比；调试模式仍可查看。</div></div>`;
+    return `<div class="card"><b>平台状态：拼多多 vs 淘宝</b><div class="grid" style="margin-top:10px;grid-template-columns:repeat(2,1fr)">${arr.map(p=>`<div class="p"><b>${esc(pName(p.platform))}</b><div class="muted">${p.ok?'已返回':'待确认'}｜${Number(p.total_count||0)} 个</div><div class="muted">${esc(p.source||p.coverage||p.message||'')}</div></div>`).join('')}</div><div class="muted" style="margin-top:8px">京东先不参与顾客端对比；调试模式仍可查看。</div></div>`;
   }
   function selectBest(goods,q){
     const buckets={official:[],channel:[],normal:[]};
@@ -95,18 +95,25 @@
     s.textContent=`.stage3-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stage3-best{min-height:210px}.stage3-best h3{line-height:1.35}.stage3-debug .tabs{display:grid!important}@media(max-width:780px){.stage3-grid{grid-template-columns:1fr}.candidate .row{display:block}.candidate .buy{width:100%;margin-top:8px}}`;
     document.head.appendChild(s);
   }
+  function fallbackTbUrl(item){
+    const name=item&&item.goods_name||lastQuery||'';
+    return name?'https://s.m.taobao.com/h5?q='+encodeURIComponent(name):'';
+  }
   async function openBuy(item){
     if(!item)return;
-    let url=item.material_url||item.url||'';
+    let url=item.material_url||item.url||item.item_url||'';
     try{
       if(item.platform==='pdd'&&item.goods_sign){
         const r=await fetch(API+'/api/pdd/link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({goods_sign:item.goods_sign})}).then(x=>x.json());
-        url=r.mobile_short_url||r.short_url||r.mobile_url||r.url||url;
+        url=r.mobile_short_url||r.short_url||r.mobile_url||r.url||r.material_url||url;
+      }
+      if(item.platform==='tb'){
+        url=url||fallbackTbUrl(item);
       }
     }catch(e){console.warn('[v17] 转链失败，使用原始链接',e)}
-    if(url) location.href=url; else alert('这个平台暂时没有可跳转购买链接。');
+    if(url) location.href=url; else alert('这个商品暂时没有可跳转购买链接。');
   }
-  document.addEventListener('click',e=>{const btn=e.target.closest&&e.target.closest('[data-stage3-buy]'); if(btn){e.preventDefault(); openBuy(goodsIndex[btn.getAttribute('data-stage3-buy')]);}});
+  document.addEventListener('click',e=>{const btn=e.target.closest&&e.target.closest('[data-stage3-buy]'); if(btn){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation(); openBuy(goodsIndex[btn.getAttribute('data-stage3-buy')]);}},true);
   injectStyle(); setCustomerMode();
   const oldRender=window.renderAll;
   if(typeof oldRender==='function'&&!oldRender.__v17stage3){
@@ -115,5 +122,5 @@
   }
   [0,300,900,1800,3500].forEach(ms=>setTimeout(setCustomerMode,ms));
   window.jiabibiStage3=true;
-  console.log('[v17] 拼多多 vs 淘宝对比层已加载');
+  console.log('[v17] 拼多多 vs 淘宝对比层已加载，淘宝购买已接管');
 })();
