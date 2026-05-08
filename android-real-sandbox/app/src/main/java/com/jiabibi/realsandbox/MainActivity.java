@@ -74,13 +74,13 @@ public class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         Button read = makeButton("读取价格");
-        Button copy = makeButton("复制结果");
+        Button buy = makeButton("买最低价");
         actions.addView(read, new LinearLayout.LayoutParams(0, -2, 1));
-        actions.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        actions.addView(buy, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(actions, new LinearLayout.LayoutParams(-1, -2));
 
         result = new TextView(this);
-        result.setText("第一性原理：只读用户本机真实页面。\n三步：选平台 → 进商品页 → 读取价格。\n长按：标题清登录态；读取=诊断；复制=JSON。\n");
+        result.setText("第一性原理：用户不是要看报告，是要买到最低价。\n三步：选平台 → 读取价格 → 买最低价。\n长按：标题清登录态；读取=诊断；买最低价=复制JSON。\n");
         result.setTextSize(13);
         result.setPadding(0, 8, 0, 8);
         result.setOnLongClickListener(v -> { clearResults(); return true; });
@@ -97,7 +97,7 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setSupportZoom(true);
         s.setBuiltInZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " JiabibiRealSandbox/0.4");
+        s.setUserAgentString(s.getUserAgentString() + " JiabibiRealSandbox/0.5");
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -119,8 +119,8 @@ public class MainActivity extends Activity {
         pdd.setOnClickListener(v -> openPlatform("pdd"));
         read.setOnClickListener(v -> capturePrice());
         read.setOnLongClickListener(v -> { diagnosePage(); return true; });
-        copy.setOnClickListener(v -> copyResult());
-        copy.setOnLongClickListener(v -> { copyJson(); return true; });
+        buy.setOnClickListener(v -> openBestForBuy());
+        buy.setOnLongClickListener(v -> { copyJson(); return true; });
 
         webView.loadUrl(DEFAULT_URL);
     }
@@ -196,6 +196,7 @@ public class MainActivity extends Activity {
         if (best != null) {
             sb.append("最便宜：").append(platformName(best.optString("platform")))
                     .append("  ¥").append(formatPrice(best.optDouble("priceNumber", 0)))
+                    .append("\n点“买最低价”回到这个商品页。")
                     .append("\n").append(shortText(best.optString("title"), 58));
         }
         sb.append("\n\n已读取 ").append(captures.length()).append(" 个平台：");
@@ -225,6 +226,21 @@ public class MainActivity extends Activity {
             }
         }
         return best;
+    }
+
+    private void openBestForBuy() {
+        JSONObject best = bestCapture();
+        if (best == null) {
+            updateStatus("还没有最低价。先进入商品页点“读取价格”，至少读取一个平台。");
+            return;
+        }
+        String url = best.optString("url");
+        if (url == null || url.length() == 0) {
+            updateStatus("最低价没有商品链接。请重新读取当前商品页。");
+            return;
+        }
+        updateStatus("正在打开最低价：" + platformName(best.optString("platform")) + "  ¥" + formatPrice(best.optDouble("priceNumber", 0)) + "\n用户确认后在平台内自己下单。");
+        openUrl(url);
     }
 
     private String formatPrice(double n) {
@@ -295,8 +311,8 @@ public class MainActivity extends Activity {
         JSONObject out = new JSONObject();
         try {
             out.put("app", "jiabibi-real-sandbox");
-            out.put("version", "v4-first-principles");
-            out.put("principle", "only observed page facts from local WebView; no fake price; no cookie upload");
+            out.put("version", "v5-buy-cheapest");
+            out.put("principle", "user wants the cheapest real observed price and a direct path to buy; local WebView only; no fake price; no cookie upload");
             out.put("lastPlatform", lastPlatform);
             out.put("lastUrl", lastUrl);
             out.put("lastPageTitle", lastPageTitle);
@@ -353,8 +369,8 @@ public class MainActivity extends Activity {
                     lastDiag = diag == null ? "" : diag.toString();
                     boolean diagnoseOnly = o.optBoolean("diagnoseOnly", false);
                     if (!diagnoseOnly) upsertCapture(o);
-                    if (diagnoseOnly) updateStatus("诊断完成。长按“复制结果”复制 JSON。\n价格节点：" + (diag == null ? "" : diag.optString("priceNodeCount")));
-                    else updateStatus("读取成功：" + platformName(o.optString("platform")) + "  " + o.optString("price") + "\n继续切平台读取，最后点复制结果。");
+                    if (diagnoseOnly) updateStatus("诊断完成。长按“买最低价”复制 JSON。\n价格节点：" + (diag == null ? "" : diag.optString("priceNodeCount")));
+                    else updateStatus("读取成功：" + platformName(o.optString("platform")) + "  " + o.optString("price") + "\n继续切平台读取，最后点买最低价。");
                 } catch (Exception e) {
                     updateStatus("读取失败：" + e.getMessage());
                 }
