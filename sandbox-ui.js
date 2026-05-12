@@ -35,7 +35,6 @@
     grid.innerHTML = state.platforms.map(p => {
       const st = (state.platformStatuses[p] || {}).status || 'created';
       const label = STATUS_LABELS[st] || st;
-      const cls = ['success','done'].includes(st) ? 'ok' : ['failed'].includes(st) ? 'bad' : ['need_user_login','need_user_action'].includes(st) ? 'warn' : '';
       const count = (state.platformStatuses[p] || {}).itemCount;
       return `<div class="sb-platform"><b>${PLATFORM_NAMES[p] || p}</b><span class="sb-status ${st}">${label}${count !== undefined ? ' · ' + count + '条' : ''}</span></div>`;
     }).join('');
@@ -44,7 +43,7 @@
 
   async function loadScreenshot(platform) {
     if (!state.sessionId) return;
-    const area = el('sb-screenshot-area');
+    const area = el('sb-screenshot');
     if (!area) return;
     try {
       const r = await fetch(`${API}/api/sandbox/session/${state.sessionId}/screenshot?platform=${platform}`, { cache: 'no-store' });
@@ -52,7 +51,7 @@
       const blob = await r.blob();
       const objUrl = URL.createObjectURL(blob);
       area.innerHTML = `<img src="${objUrl}" alt="${PLATFORM_NAMES[platform] || platform}当前页面" style="max-width:100%;border-radius:12px;border:1px solid #e8e8ed" />
-        <p style="font-size:12px;color:#86868b;margin-top:6px">${PLATFORM_NAMES[platform] || platform}当前页面突屏。如需登录/扫码请在页面中操作，然后点「开始搜索」。</p>`;
+        <p style="font-size:12px;color:#86868b;margin-top:6px">${PLATFORM_NAMES[platform] || platform}当前页面截屏。如需登录/扫码请在页面中操作，然后点「开始搜索」。</p>`;
     } catch (e) {
       area.innerHTML = `<p>截图加载失败：${e.message}</p>`;
     }
@@ -86,7 +85,13 @@
         body: JSON.stringify({ platforms: state.platforms, keyword }),
       });
       const d = await r.json();
-      if (!d.ok) throw new Error(d.message || d.error || '创建失败');
+      if (!d.ok) {
+        if (d.error === 'sandbox_disabled') {
+          alert('真实验价功能暂未开启。如需使用，请联系管理员设置 SANDBOX_ENABLED=true。');
+          return false;
+        }
+        throw new Error(d.message || d.error || '创建失败');
+      }
       state.sessionId = d.sessionId;
       state.platformStatuses = {};
       for (const p of state.platforms) state.platformStatuses[p] = { status: 'created' };
@@ -159,7 +164,10 @@
 
   function mergeAndRefreshDisplay() {
     if (!window.renderAll || !window.lastApiData || !state.sandboxItems.length) return;
-    const sandboxConverted = state.sandboxItems.map(sandboxToApiFormat);
+    const sandboxConverted = state.sandboxItems
+      .filter(item => (item.confidence || 0) >= 0.65)
+      .map(sandboxToApiFormat);
+    if (!sandboxConverted.length) return;
     const merged = {
       ...window.lastApiData,
       goods_list: [...(window.lastApiData.goods_list || []), ...sandboxConverted],
@@ -182,7 +190,6 @@
     state.sandboxItems = [];
     const badge = el('sb-result-badge');
     if (badge) badge.style.display = 'none';
-    // Refresh display to API-only results
     if (window.renderAll && window.lastApiData) {
       window.renderAll(window.lastApiData, window.lastQ || state.keyword);
     }
