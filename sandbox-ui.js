@@ -71,6 +71,12 @@
       const statusEl = el('sb-session-status');
       if (statusEl) statusEl.textContent = `会话状态：${STATUS_LABELS[d.status] || d.status} · 过期时间：${d.expiresAt ? new Date(d.expiresAt).toLocaleTimeString() : '未知'}`;
       if (['expired', 'closed'].includes(d.status)) stopPolling();
+      // Auto-refresh screenshot when the current platform needs user attention
+      // (login page / captcha) — the user can see what the browser shows without clicking.
+      const curSt = (state.platformStatuses[state.currentPlatform] || {}).status;
+      if (['need_user_login', 'need_user_action', 'searching'].includes(curSt)) {
+        loadScreenshot(state.currentPlatform);
+      }
     } catch (_) {}
   }
 
