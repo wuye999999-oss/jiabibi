@@ -163,17 +163,42 @@
   }
 
   function mergeAndRefreshDisplay() {
-    if (!window.renderAll || !window.lastApiData || !state.sandboxItems.length) return;
+    if (!window.renderAll || !state.sandboxItems.length) return;
     const sandboxConverted = state.sandboxItems
       .filter(item => (item.confidence || 0) >= 0.65)
       .map(sandboxToApiFormat);
     if (!sandboxConverted.length) return;
+    const base = window.lastApiData || { goods_list: [], total_count: 0 };
     const merged = {
-      ...window.lastApiData,
-      goods_list: [...(window.lastApiData.goods_list || []), ...sandboxConverted],
-      total_count: (window.lastApiData.goods_list || []).length + sandboxConverted.length,
+      ...base,
+      goods_list: [...(base.goods_list || []), ...sandboxConverted],
+      total_count: (base.goods_list || []).length + sandboxConverted.length,
     };
     window.renderAll(merged, window.lastQ || state.keyword);
+  }
+
+  async function quickSearch(keyword) {
+    const q = String(keyword || '').trim();
+    if (!q) return null;
+    state.keyword = q;
+    try {
+      const r = await fetch(`${API}/api/sandbox/quick-search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: q, platforms: ['jd', 'pdd', 'taobao'] }),
+      });
+      if (r.status === 501) return null; // sandbox disabled — silent, no alert
+      if (r.status === 429) return null; // server busy — silent
+      const d = await r.json();
+      if (!d.ok || !d.results || !d.results.length) return d;
+      state.sandboxItems = d.results;
+      const badge = el('sb-result-badge');
+      if (badge) { badge.textContent = d.total + '条验价结果'; badge.style.display = 'inline-block'; }
+      mergeAndRefreshDisplay();
+      return d;
+    } catch (_) {
+      return null;
+    }
   }
 
   async function close() {
@@ -216,12 +241,12 @@
     state.closed = false;
     state.sandboxItems = [];
     const ok = await createSession();
-    if (ok) showPanel();
+    if (ok) { showPanel(); runSearch(); }
   }
 
   function cancelConsent() {
     el('consent-modal').classList.remove('show');
   }
 
-  window.SandboxUI = { open: openConsentModal, confirmStart, cancelConsent, close, runSearch, switchPlatform, refreshScreenshot };
+  window.SandboxUI = { open: openConsentModal, confirmStart, cancelConsent, close, runSearch, switchPlatform, refreshScreenshot, quickSearch };
 })();
