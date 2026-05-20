@@ -16,6 +16,7 @@
   };
 
   let sandboxAvailable = null; // null=unknown, true=available, false=disabled(501)
+  let quickSearchController = null; // AbortController for in-flight quick-search
 
   let state = {
     sessionId: null,
@@ -195,12 +196,17 @@
     const q = String(keyword || '').trim();
     if (!q) return null;
     if (sandboxAvailable === false) return null; // skip if already known disabled
+    // Abort any in-flight request for a previous keyword to prevent stale results.
+    if (quickSearchController) { quickSearchController.abort(); quickSearchController = null; }
+    const ctrl = new AbortController();
+    quickSearchController = ctrl;
     state.keyword = q;
     try {
       const r = await fetch(`${API}/api/sandbox/quick-search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keyword: q, platforms: ['jd', 'pdd', 'taobao'] }),
+        signal: ctrl.signal,
       });
       if (r.status === 501) { sandboxAvailable = false; return null; } // sandbox disabled — cache and skip
       if (r.status === 429) return null; // server busy — silent, don't cache
@@ -212,8 +218,11 @@
       if (badge) { badge.textContent = d.total + '条验价结果'; badge.style.display = 'inline-block'; }
       mergeAndRefreshDisplay();
       return d;
-    } catch (_) {
+    } catch (e) {
+      if (e && e.name === 'AbortError') return null; // silently cancelled by newer search
       return null;
+    } finally {
+      if (quickSearchController === ctrl) quickSearchController = null;
     }
   }
 
