@@ -390,7 +390,7 @@ public class MainActivity extends Activity {
                 "function meta(name){var e=document.querySelector('meta[property=\\\"'+name+'\\\"],meta[name=\\\"'+name+'\\\"]');return e?e.getAttribute('content')||'':''}" +
                 "function money(s){s=String(s||'');var m=s.match(/(?:到手价|券后价|券后|秒杀价|活动价|预估|价格|¥|￥)\\s*[:：]?\\s*[¥￥]?\\s*([0-9]+(?:\\.[0-9]{1,2})?)/);if(m)return m[0];var m2=s.match(/[¥￥]\\s*([0-9]+(?:\\.[0-9]{1,2})?)/);return m2?m2[0]:''}" +
                 "var host=location.hostname.toLowerCase();" +
-                "var platform=host.indexOf('taobao')>-1||host.indexOf('tmall')>-1?'taobao':(host.indexOf('jd.com')>-1||host.indexOf('3.cn')>-1?'jd':(host.indexOf('yangkeduo')>-1||host.indexOf('pinduoduo')>-1?'pdd':'unknown'));" +
+                "var platform=host.indexOf('taobao')>-1||host.indexOf('tmall')>-1?'taobao':(host.indexOf('jd.com')>-1||host.indexOf('3.cn')>-1?'jd':(host.indexOf('yangkeduo')>-1||host.indexOf('pinduoduo')>-1?'pdd':(host.indexOf('douyin')>-1||host.indexOf('jinritemai')>-1||host.indexOf('tiktok')>-1?'douyin':'unknown')));" +
                 "var commonTitle=['#goods_name','.sku-name','.goods-name','.goods-title','.title','.item-title','.tb-main-title','h1'];" +
                 "var jdTitle=['.sku-name','#itemName','.prod-title','.good-detail-title','.item-title','h1'];" +
                 "var tbTitle=['.tb-main-title','.module-title','.item-title','.rax-view-v2','h1'];" +
