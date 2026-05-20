@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
         root.addView(actions, new LinearLayout.LayoutParams(-1, -2));
 
         result = new TextView(this);
-        result.setText("第一性原理：用户不是要看报告，是要买到最低价。\n三步：选平台 → 读取价格 → 买最低价。\n长按：标题清登录态；读取=诊断；买最低价=复制JSON。\n");
+        result.setText("三步：选平台 → 进商品页 → 读取价格。\n自动算单位价(¥/kg、¥/L…)，显示运费，按铁律5比较。\n长按：标题=清登录态；读取价格=诊断；买最低价=复制JSON；结果区=清空。\n");
         result.setTextSize(13);
         result.setPadding(0, 8, 0, 8);
         result.setOnLongClickListener(v -> { clearResults(); return true; });
@@ -252,7 +252,9 @@ public class MainActivity extends Activity {
             updateStatus("最低价没有商品链接。请重新读取当前商品页。");
             return;
         }
-        updateStatus("正在打开最低价：" + platformName(best.optString("platform")) + "  ¥" + formatPrice(best.optDouble("priceNumber", 0)) + "\n用户确认后在平台内自己下单。");
+        String unitT = best.optString("unitText");
+        String unitLine = unitT.length() > 0 ? "（" + unitT + "）\n" : "";
+        updateStatus("正在打开最低价：" + platformName(best.optString("platform")) + "  ¥" + formatPrice(best.optDouble("priceNumber", 0)) + "\n" + unitLine + "用户确认后在平台内自己下单。");
         openUrl(url);
     }
 
@@ -415,7 +417,7 @@ public class MainActivity extends Activity {
         JSONObject out = new JSONObject();
         try {
             out.put("app", "jiabibi-real-sandbox");
-            out.put("version", "v5-buy-cheapest");
+            out.put("version", "v6-unit-price");
             out.put("principle", "user wants the cheapest real observed UNIT price (¥/unit + shipping) and a direct path to buy; local WebView only; no fake price; no cookie upload");
             out.put("lastPlatform", lastPlatform);
             out.put("lastUrl", lastUrl);
@@ -473,8 +475,14 @@ public class MainActivity extends Activity {
                     lastDiag = diag == null ? "" : diag.toString();
                     boolean diagnoseOnly = o.optBoolean("diagnoseOnly", false);
                     if (!diagnoseOnly) upsertCapture(o);
-                    if (diagnoseOnly) updateStatus("诊断完成。长按“买最低价”复制 JSON。\n价格节点：" + (diag == null ? "" : diag.optString("priceNodeCount")));
-                    else updateStatus("读取成功：" + platformName(o.optString("platform")) + "  " + o.optString("price") + "\n继续切平台读取，最后点买最低价。");
+                    if (diagnoseOnly) updateStatus(“诊断完成。长按”买最低价”复制 JSON。\n价格节点：” + (diag == null ? “” : diag.optString(“priceNodeCount”)));
+                    else {
+                        String unitT = o.optString(“unitText”);
+                        String ship = o.optString(“ship”);
+                        String extra = (unitT.length() > 0 ? “\n单价：” + unitT : “”)
+                                     + (ship.length() > 0 ? “\n运费：” + ship : “”);
+                        updateStatus(“读取成功：” + platformName(o.optString(“platform”)) + “  “ + o.optString(“price”) + extra + “\n继续切平台读取，最后点买最低价。”);
+                    }
                 } catch (Exception e) {
                     updateStatus("读取失败：" + e.getMessage());
                 }
