@@ -201,6 +201,9 @@
     const ctrl = new AbortController();
     quickSearchController = ctrl;
     state.keyword = q;
+    // Timeout: cold Render start (~50s) + 3-platform sequential search (~75s) = 125s max.
+    // Cap at 90s so we fail fast rather than hanging indefinitely.
+    const timeoutId = setTimeout(() => ctrl.abort(), 90000);
     try {
       const r = await fetch(`${API}/api/sandbox/quick-search`, {
         method: 'POST',
@@ -208,6 +211,7 @@
         body: JSON.stringify({ keyword: q, platforms: ['jd', 'pdd', 'taobao'] }),
         signal: ctrl.signal,
       });
+      clearTimeout(timeoutId);
       if (r.status === 501) { sandboxAvailable = false; return null; } // sandbox disabled — cache and skip
       if (r.status === 429) return null; // server busy — silent, don't cache
       sandboxAvailable = true;
@@ -219,7 +223,8 @@
       mergeAndRefreshDisplay();
       return d;
     } catch (e) {
-      if (e && e.name === 'AbortError') return null; // silently cancelled by newer search
+      clearTimeout(timeoutId);
+      if (e && e.name === 'AbortError') return null; // silently cancelled by newer search or 90s timeout
       return null;
     } finally {
       if (quickSearchController === ctrl) quickSearchController = null;
