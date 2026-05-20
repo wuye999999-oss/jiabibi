@@ -1,6 +1,7 @@
 // app-v17-stage3.js — 价比比前端主逻辑
 // v17 stage3: 提取自 index.html 内联脚本，API 指向 https://jiabibi-api.onrender.com
 const API='https://jiabibi-api.onrender.com';
+window.API=API;
 const platforms=[['pdd','拼多多'],['jd','京东'],['tb','淘宝'],['douyin','抖音']];
 const platformIds=platforms.map(x=>x[0]);
 const groups=[['official','官方/自营最低价'],['channel','渠道店最低价'],['normal','普通店最低价']];
