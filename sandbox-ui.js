@@ -204,6 +204,14 @@
       const d = await r.json();
       if (!d.ok || !d.results || !d.results.length) return d;
       state.sandboxItems = d.results;
+      // If the server returned pre-ranked best items, inject them first so the user
+      // sees the winner immediately; the full item list is also merged for context.
+      if (d.best) {
+        const winners = [d.best.official_best, d.best.channel_best, d.best.normal_best]
+          .filter(Boolean)
+          .filter(x => !state.sandboxItems.some(y => y.itemUrl && y.itemUrl === x.itemUrl));
+        if (winners.length) state.sandboxItems = [...winners, ...state.sandboxItems];
+      }
       const badge = el('sb-result-badge');
       if (badge) { badge.textContent = d.total + '条验价结果'; badge.style.display = 'inline-block'; }
       mergeAndRefreshDisplay();
