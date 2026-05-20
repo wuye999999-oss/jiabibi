@@ -192,12 +192,18 @@ public class MainActivity extends Activity {
     private String renderCaptures() {
         if (captures.length() == 0) return "结果：暂无";
         JSONObject best = bestCapture();
+        boolean byUnit = commonUnitKind().length() > 0;
         StringBuilder sb = new StringBuilder();
         if (best != null) {
-            sb.append("最便宜：").append(platformName(best.optString("platform")))
-                    .append("  ¥").append(formatPrice(best.optDouble("priceNumber", 0)))
-                    .append("\n点“买最低价”回到这个商品页。")
+            sb.append(byUnit ? "最便宜（按单位价）：" : "最便宜：").append(platformName(best.optString("platform")))
+                    .append("  ¥").append(formatPrice(best.optDouble("priceNumber", 0)));
+            String bu = best.optString("unitText");
+            if (bu.length() > 0) sb.append("（").append(bu).append("）");
+            sb.append("\n点“买最低价”回到这个商品页。")
                     .append("\n").append(shortText(best.optString("title"), 58));
+        }
+        if (captures.length() > 1 && !byUnit) {
+            sb.append("\n注意：各平台规格不一致，下面按标价排序，请自行核对单位价。");
         }
         sb.append("\n\n已读取 ").append(captures.length()).append(" 个平台：");
         for (int i = 0; i < captures.length(); i++) {
@@ -206,6 +212,10 @@ public class MainActivity extends Activity {
             double n = o.optDouble("priceNumber", 0);
             sb.append("\n").append(i + 1).append(". ").append(platformName(o.optString("platform")))
                     .append("  ").append(n > 0 ? "¥" + formatPrice(n) : shortText(o.optString("price"), 28));
+            String unit = o.optString("unitText");
+            if (unit.length() > 0) sb.append("\n   单价：").append(unit);
+            String ship = o.optString("ship");
+            if (ship.length() > 0) sb.append("\n   运费：").append(shortText(ship, 30));
             String promo = o.optString("promoPrice");
             if (promo.length() > 0) sb.append("\n   活动：").append(shortText(promo, 42));
             sb.append("\n   ").append(shortText(o.optString("title"), 56));
@@ -214,14 +224,17 @@ public class MainActivity extends Activity {
     }
 
     private JSONObject bestCapture() {
+        // 铁律5: rank by unit price when every capture shares the same unit; otherwise
+        // by sticker price (an honest fallback — the UI tells the user to check specs).
+        boolean byUnit = commonUnitKind().length() > 0;
         JSONObject best = null;
-        double bestPrice = Double.MAX_VALUE;
+        double bestVal = Double.MAX_VALUE;
         for (int i = 0; i < captures.length(); i++) {
             JSONObject o = captures.optJSONObject(i);
             if (o == null) continue;
-            double n = o.optDouble("priceNumber", 0);
-            if (n > 0 && n < bestPrice) {
-                bestPrice = n;
+            double v = byUnit ? o.optDouble("unitValue", 0) : o.optDouble("priceNumber", 0);
+            if (v > 0 && v < bestVal) {
+                bestVal = v;
                 best = o;
             }
         }
@@ -246,6 +259,73 @@ public class MainActivity extends Activity {
     private String formatPrice(double n) {
         if (Math.abs(n - Math.round(n)) < 0.001) return String.valueOf((long)Math.round(n));
         return String.format(java.util.Locale.US, "%.2f", n);
+    }
+
+    // 铁律5: cross-platform comparison must use unit price, not the sticker price.
+    // Parses weight / volume / capacity / count from the title+spec and computes ¥ per standard unit.
+    private void applyUnitPrice(JSONObject o, double price) {
+        double unitValue = 0;
+        String unitText = "", unitKind = "";
+        if (price > 0) {
+            String t = (o.optString("title") + " " + o.optString("spec")).toLowerCase().replaceAll("\\s+", "");
+            Matcher m;
+            m = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)(kg|千克|斤|g|克)(?:[*x×]([0-9]+))?").matcher(t);
+            if (m.find()) {
+                double w = Double.parseDouble(m.group(1));
+                String u = m.group(2);
+                if (u.equals("斤")) w *= 0.5;
+                else if (u.equals("g") || u.equals("克")) w /= 1000;
+                if (m.group(3) != null) w *= Integer.parseInt(m.group(3));
+                if (w > 0) { unitValue = price / w; unitKind = "kg"; unitText = formatPrice(w) + "kg｜¥" + formatPrice(unitValue) + "/kg"; }
+            }
+            if (unitValue == 0) {
+                m = Pattern.compile("([0-9]+(?:\\.[0-9]+)?)(ml|毫升|l|升)(?:[*x×]([0-9]+))?").matcher(t);
+                if (m.find()) {
+                    double ml = Double.parseDouble(m.group(1));
+                    String u = m.group(2);
+                    if (u.equals("l") || u.equals("升")) ml *= 1000;
+                    int c = m.group(3) != null ? Integer.parseInt(m.group(3)) : 1;
+                    double total = ml * c;
+                    if (total > 0) { unitValue = price / (total / 1000); unitKind = "L"; unitText = (long) ml + "ml×" + c + "｜¥" + formatPrice(unitValue) + "/L"; }
+                }
+            }
+            if (unitValue == 0) {
+                m = Pattern.compile("([0-9]{4,6})(mah|毫安)").matcher(t);
+                if (m.find()) {
+                    double cap = Double.parseDouble(m.group(1));
+                    if (cap > 0) { unitValue = price / (cap / 10000); unitKind = "万mAh"; unitText = (long) cap + "mAh｜¥" + formatPrice(unitValue) + "/万mAh"; }
+                }
+            }
+            if (unitValue == 0) {
+                m = Pattern.compile("([0-9]+)(件|包|袋|瓶|抽|卷|片|个|支|盒|双|条)(?:[*x×]([0-9]+))?").matcher(t);
+                if (m.find()) {
+                    double cnt = Double.parseDouble(m.group(1));
+                    if (m.group(3) != null) cnt *= Integer.parseInt(m.group(3));
+                    if (cnt > 1) { unitValue = price / cnt; unitKind = m.group(2); unitText = (long) cnt + m.group(2) + "｜¥" + formatPrice(unitValue) + "/" + m.group(2); }
+                }
+            }
+        }
+        try {
+            o.put("unitValue", unitValue);
+            o.put("unitText", unitText);
+            o.put("unitKind", unitKind);
+        } catch (Exception ignored) {}
+    }
+
+    // Empty unless every capture shares the same valid unit kind — comparing ¥/kg
+    // against ¥/件 would be meaningless.
+    private String commonUnitKind() {
+        if (captures.length() == 0) return "";
+        String k0 = null;
+        for (int i = 0; i < captures.length(); i++) {
+            JSONObject o = captures.optJSONObject(i);
+            if (o == null) return "";
+            String k = o.optString("unitKind");
+            if (k.length() == 0 || o.optDouble("unitValue", 0) <= 0) return "";
+            if (k0 == null) k0 = k;
+            else if (!k0.equals(k)) return "";
+        }
+        return k0 == null ? "" : k0;
     }
 
     private double extractMoney(String text) {
@@ -286,6 +366,7 @@ public class MainActivity extends Activity {
             priceNumber = listPrice > 0 ? listPrice : promoPrice;
         }
         try { o.put("priceNumber", priceNumber); } catch (Exception ignored) {}
+        applyUnitPrice(o, priceNumber);
         for (int i = captures.length() - 1; i >= 0; i--) {
             JSONObject old = captures.optJSONObject(i);
             if (old != null && p.equals(old.optString("platform"))) captures.remove(i);
@@ -319,8 +400,10 @@ public class MainActivity extends Activity {
                 "var spec=pick(['[class*=sku]','[class*=Sku]','[class*=spec]','[class*=Spec]','[class*=selected]']);" +
                 "var shop=pick(['.shop-name','.seller-name','.shop-title','.mall-name','.store-name','[class*=shop]','[class*=Shop]','[class*=seller]','[class*=Seller]']);" +
                 "var image=pickAttr(['meta[property=\\\"og:image\\\"]'],'content')||pickAttr(['img'],'src');" +
+                // 铁律5: shipping is a hidden cost — capture it so the user sees the real total.
+                "var ship='';try{var sm=body.match(/包邮|免运费|运费\\s*[¥￥]?\\s*[0-9]+(?:\\.[0-9]{1,2})?|快递\\s*[¥￥]?\\s*[0-9]+(?:\\.[0-9]{1,2})?|不包邮|偏远地区/);ship=sm?sm[0]:'';}catch(err){}" +
                 "var diag={platform:platform,host:host,href:location.href,titleText:document.title,bodyLength:body.length,priceNodeCount:document.querySelectorAll('[class*=price],[class*=Price]').length,imgCount:document.images.length,sample:body.slice(0,900)};" +
-                "var data={platform:platform,host:host,title:title,price:price,promoPrice:promo,spec:spec,shop:shop,image:image,url:location.href,time:new Date().toISOString(),ua:navigator.userAgent,diagnoseOnly:" + diagnoseOnly + ",diag:diag};" +
+                "var data={platform:platform,host:host,title:title,price:price,promoPrice:promo,spec:spec,shop:shop,image:image,ship:ship,url:location.href,time:new Date().toISOString(),ua:navigator.userAgent,diagnoseOnly:" + diagnoseOnly + ",diag:diag};" +
                 "JiabibiBridge.onCapture(JSON.stringify(data));" +
                 "})();";
     }
@@ -333,7 +416,7 @@ public class MainActivity extends Activity {
         try {
             out.put("app", "jiabibi-real-sandbox");
             out.put("version", "v5-buy-cheapest");
-            out.put("principle", "user wants the cheapest real observed price and a direct path to buy; local WebView only; no fake price; no cookie upload");
+            out.put("principle", "user wants the cheapest real observed UNIT price (¥/unit + shipping) and a direct path to buy; local WebView only; no fake price; no cookie upload");
             out.put("lastPlatform", lastPlatform);
             out.put("lastUrl", lastUrl);
             out.put("lastPageTitle", lastPageTitle);

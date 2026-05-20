@@ -128,6 +128,12 @@
         const badge = el('sb-result-badge');
         if (badge) { badge.textContent = d.total + '条结果'; badge.style.display = 'inline-block'; }
         mergeAndRefreshDisplay();
+      } else {
+        const blocked = Object.values(d.platforms || {}).some(p => p && ['need_user_action', 'need_user_login'].includes(p.status));
+        const statusEl = el('sb-session-status');
+        if (statusEl && blocked) {
+          statusEl.textContent = '部分平台需要登录或人工通过验证码。请切到对应平台标签，在下方截图里完成登录/验证，然后再次点「开始搜索」。';
+        }
       }
       await loadScreenshot(state.currentPlatform);
     } catch (e) {
