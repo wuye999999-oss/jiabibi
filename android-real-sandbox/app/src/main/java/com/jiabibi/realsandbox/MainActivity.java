@@ -305,7 +305,7 @@ public class MainActivity extends Activity {
                 }
             }
             if (unitValue == 0) {
-                m = Pattern.compile("([0-9]+)(件|包|袋|瓶|抽|卷|片|个|支|盒|双|条)(?:[*x×]([0-9]+))?").matcher(t);
+                m = Pattern.compile("([0-9]+)(件|包|袋|瓶|罐|抽|卷|片|张|个|支|盒|双|条)(?:[*x×]([0-9]+))?").matcher(t);
                 if (m.find()) {
                     double cnt = Double.parseDouble(m.group(1));
                     if (m.group(3) != null) cnt *= Integer.parseInt(m.group(3));
