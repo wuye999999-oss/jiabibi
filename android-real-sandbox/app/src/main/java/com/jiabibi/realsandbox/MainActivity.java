@@ -485,11 +485,13 @@ public class MainActivity extends Activity {
                     if (!diagnoseOnly) upsertCapture(o);
                     if (diagnoseOnly) updateStatus(“诊断完成。长按”买最低价”复制 JSON。\n价格节点：” + (diag == null ? “” : diag.optString(“priceNodeCount”)));
                     else {
+                        String platform = o.optString(“platform”);
                         String unitT = o.optString(“unitText”);
                         String ship = o.optString(“ship”);
                         String extra = (unitT.length() > 0 ? “\n单价：” + unitT : “”)
                                      + (ship.length() > 0 ? “\n运费：” + ship : “”);
-                        updateStatus(“读取成功：” + platformName(o.optString(“platform”)) + “  “ + o.optString(“price”) + extra + “\n继续切平台读取，最后点买最低价。”);
+                        String unknownNote = “unknown”.equals(platform) ? “\n注：当前页面不是支持的平台，价格仅供参考。” : “”;
+                        updateStatus(“读取成功：” + platformName(platform) + “  “ + o.optString(“price”) + extra + unknownNote + “\n继续切平台读取，最后点买最低价。”);
                     }
                 } catch (Exception e) {
                     updateStatus("读取失败：" + e.getMessage());
