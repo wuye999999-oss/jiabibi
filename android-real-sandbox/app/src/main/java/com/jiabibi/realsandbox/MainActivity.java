@@ -66,9 +66,11 @@ public class MainActivity extends Activity {
         Button tb = makeButton("淘宝");
         Button jd = makeButton("京东");
         Button pdd = makeButton("拼多多");
+        Button dy = makeButton("抖音");
         platforms.addView(tb, new LinearLayout.LayoutParams(0, -2, 1));
         platforms.addView(jd, new LinearLayout.LayoutParams(0, -2, 1));
         platforms.addView(pdd, new LinearLayout.LayoutParams(0, -2, 1));
+        platforms.addView(dy, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(platforms, new LinearLayout.LayoutParams(-1, -2));
 
         LinearLayout actions = new LinearLayout(this);
@@ -80,7 +82,7 @@ public class MainActivity extends Activity {
         root.addView(actions, new LinearLayout.LayoutParams(-1, -2));
 
         result = new TextView(this);
-        result.setText("三步：选平台 → 进商品页 → 读取价格。\n自动算单位价(¥/kg、¥/L…)，显示运费，按铁律5比较。\n长按：标题=清登录态；读取价格=诊断；买最低价=复制JSON；结果区=清空。\n");
+        result.setText("四平台：淘宝/京东/拼多多/抖音 → 进商品页 → 读取价格。\n自动算单位价(¥/kg、¥/L…)，显示运费，四平台对比。\n长按：标题=清登录态；读取价格=诊断；买最低价=复制JSON；结果区=清空。\n");
         result.setTextSize(13);
         result.setPadding(0, 8, 0, 8);
         result.setOnLongClickListener(v -> { clearResults(); return true; });
@@ -117,6 +119,7 @@ public class MainActivity extends Activity {
         tb.setOnClickListener(v -> openPlatform("tb"));
         jd.setOnClickListener(v -> openPlatform("jd"));
         pdd.setOnClickListener(v -> openPlatform("pdd"));
+        dy.setOnClickListener(v -> openPlatform("douyin"));
         read.setOnClickListener(v -> capturePrice());
         read.setOnLongClickListener(v -> { diagnosePage(); return true; });
         buy.setOnClickListener(v -> openBestForBuy());
@@ -150,6 +153,7 @@ public class MainActivity extends Activity {
             String url;
             if ("tb".equals(platform)) url = "https://s.m.taobao.com/h5?q=" + e;
             else if ("pdd".equals(platform)) url = "https://mobile.yangkeduo.com/search_result.html?search_key=" + e;
+            else if ("douyin".equals(platform)) url = "https://haohuo.jinritemai.com/views/product/list?search_text=" + e;
             else url = "https://m.jd.com/ware/search.action?keyword=" + e;
             openUrl(url);
         } catch (Exception ex) {
@@ -169,6 +173,7 @@ public class MainActivity extends Activity {
         if (u.contains("taobao") || u.contains("tmall") || u.contains("tb.cn")) return "taobao";
         if (u.contains("jd.com") || u.contains("3.cn")) return "jd";
         if (u.contains("pinduoduo") || u.contains("yangkeduo") || u.contains("pdd")) return "pdd";
+        if (u.contains("douyin") || u.contains("jinritemai") || u.contains("tiktok")) return "douyin";
         return "unknown";
     }
 
@@ -176,6 +181,7 @@ public class MainActivity extends Activity {
         if ("taobao".equals(p)) return "淘宝";
         if ("jd".equals(p)) return "京东";
         if ("pdd".equals(p)) return "拼多多";
+        if ("douyin".equals(p)) return "抖音";
         return "未知平台";
     }
 
@@ -389,11 +395,13 @@ public class MainActivity extends Activity {
                 "var jdTitle=['.sku-name','#itemName','.prod-title','.good-detail-title','.item-title','h1'];" +
                 "var tbTitle=['.tb-main-title','.module-title','.item-title','.rax-view-v2','h1'];" +
                 "var pddTitle=['[class*=goodsName]','[class*=goods-name]','[class*=title]','h1'];" +
+                "var dyTitle=['[class*=title]','[class*=goods-name]','[class*=productName]','[class*=product-name]','h1'];" +
                 "var priceSel=['.price','.price-current','.real-price','.tm-price','.tb-rmb-num','.jd-price','.p-price','.price_wrap','[class*=Price]','[class*=price]'];" +
                 "if(platform==='jd')priceSel=['.jd-price','.price','.p-price','[class*=price]','[class*=Price]'];" +
                 "if(platform==='taobao')priceSel=['.tm-price','.tb-rmb-num','.price','.real-price','[class*=price]','[class*=Price]'];" +
                 "if(platform==='pdd')priceSel=['[class*=price]','[class*=Price]','.price','.goods-price'];" +
-                "var title=pick(platform==='jd'?jdTitle:(platform==='taobao'?tbTitle:(platform==='pdd'?pddTitle:commonTitle)))||meta('og:title')||document.title;" +
+                "if(platform==='douyin')priceSel=['[class*=price]','[class*=Price]','[class*=amount]','[class*=Amount]','.price'];" +
+                "var title=pick(platform==='jd'?jdTitle:(platform==='taobao'?tbTitle:(platform==='pdd'?pddTitle:(platform==='douyin'?dyTitle:commonTitle))))||meta('og:title')||document.title;" +
                 "var price=pick(priceSel);var body=document.body.innerText||'';if(!price||price.length>80)price=money(body)||price;" +
                 "var promo=pick(['[class*=coupon]','[class*=Coupon]','[class*=promo]','[class*=Promo]','[class*=activity]','[class*=Activity]']);" +
                 // Only trust 券后价/到手价/秒杀价 — these precede a real FINAL price.
@@ -417,7 +425,7 @@ public class MainActivity extends Activity {
         JSONObject out = new JSONObject();
         try {
             out.put("app", "jiabibi-real-sandbox");
-            out.put("version", "v6-unit-price");
+            out.put("version", "v7-douyin");
             out.put("principle", "user wants the cheapest real observed UNIT price (¥/unit + shipping) and a direct path to buy; local WebView only; no fake price; no cookie upload");
             out.put("lastPlatform", lastPlatform);
             out.put("lastUrl", lastUrl);
