@@ -15,6 +15,8 @@
     expired: '已过期', closed: '已关闭', done: '已完成',
   };
 
+  let sandboxAvailable = null; // null=unknown, true=available, false=disabled(501)
+
   let state = {
     sessionId: null,
     keyword: '',
@@ -192,6 +194,7 @@
   async function quickSearch(keyword) {
     const q = String(keyword || '').trim();
     if (!q) return null;
+    if (sandboxAvailable === false) return null; // skip if already known disabled
     state.keyword = q;
     try {
       const r = await fetch(`${API}/api/sandbox/quick-search`, {
@@ -199,8 +202,9 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ keyword: q, platforms: ['jd', 'pdd', 'taobao'] }),
       });
-      if (r.status === 501) return null; // sandbox disabled — silent, no alert
-      if (r.status === 429) return null; // server busy — silent
+      if (r.status === 501) { sandboxAvailable = false; return null; } // sandbox disabled — cache and skip
+      if (r.status === 429) return null; // server busy — silent, don't cache
+      sandboxAvailable = true;
       const d = await r.json();
       if (!d.ok || !d.results || !d.results.length) return d;
       state.sandboxItems = d.results;
@@ -227,8 +231,9 @@
     state.sandboxItems = [];
     const badge = el('sb-result-badge');
     if (badge) badge.style.display = 'none';
-    if (window.renderAll && window.lastApiData) {
-      window.renderAll(window.lastApiData, window.lastQ || state.keyword);
+    if (window.renderAll) {
+      const base = window.lastApiData || { goods_list: [], total_count: 0 };
+      window.renderAll(base, window.lastQ || state.keyword);
     }
   }
 
