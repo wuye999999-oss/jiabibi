@@ -76,13 +76,15 @@ public class MainActivity extends Activity {
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
         Button read = makeButton("读取价格");
+        Button copy = makeButton("复制结果");
         Button buy = makeButton("买最低价");
         actions.addView(read, new LinearLayout.LayoutParams(0, -2, 1));
+        actions.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
         actions.addView(buy, new LinearLayout.LayoutParams(0, -2, 1));
         root.addView(actions, new LinearLayout.LayoutParams(-1, -2));
 
         result = new TextView(this);
-        result.setText("四平台：淘宝/京东/拼多多/抖音 → 进商品页 → 读取价格。\n自动算单位价(¥/kg、¥/L…)，显示运费，四平台对比。\n长按：标题=清登录态；读取价格=诊断；买最低价=复制JSON；结果区=清空。\n");
+        result.setText("四平台：淘宝/京东/拼多多/抖音 → 进商品页 → 读取价格。\n自动算单位价(¥/kg、¥/L…)，显示运费，四平台对比。\n长按：标题=清登录态；读取价格=诊断；买最低价=复制JSON；结果区=清空。\n复制结果=复制文字对比结果。\n");
         result.setTextSize(13);
         result.setPadding(0, 8, 0, 8);
         result.setOnLongClickListener(v -> { clearResults(); return true; });
@@ -122,6 +124,7 @@ public class MainActivity extends Activity {
         dy.setOnClickListener(v -> openPlatform("douyin"));
         read.setOnClickListener(v -> capturePrice());
         read.setOnLongClickListener(v -> { diagnosePage(); return true; });
+        copy.setOnClickListener(v -> copyResult());
         buy.setOnClickListener(v -> openBestForBuy());
         buy.setOnLongClickListener(v -> { copyJson(); return true; });
 
