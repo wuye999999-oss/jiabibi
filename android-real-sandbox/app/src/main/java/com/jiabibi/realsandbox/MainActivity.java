@@ -402,7 +402,7 @@ public class MainActivity extends Activity {
                 "if(platform==='pdd')priceSel=['[class*=price]','[class*=Price]','.price','.goods-price'];" +
                 "if(platform==='douyin')priceSel=['[class*=price]','[class*=Price]','[class*=amount]','[class*=Amount]','.price'];" +
                 "var title=pick(platform==='jd'?jdTitle:(platform==='taobao'?tbTitle:(platform==='pdd'?pddTitle:(platform==='douyin'?dyTitle:commonTitle))))||meta('og:title')||document.title;" +
-                "var price=pick(priceSel);var body=document.body.innerText||'';if(!price||price.length>80)price=money(body)||price;" +
+                "var price=pick(priceSel);var body=(document.body.innerText||'').slice(0,4000);if(!price||price.length>80)price=money(body)||price;" +
                 "var promo=pick(['[class*=coupon]','[class*=Coupon]','[class*=promo]','[class*=Promo]','[class*=activity]','[class*=Activity]']);" +
                 // Only trust 券后价/到手价/秒杀价 — these precede a real FINAL price.
                 // 满减/立减/优惠 describe discount *rules* ("满300减50"), not a final price.
@@ -412,7 +412,7 @@ public class MainActivity extends Activity {
                 "var image=pickAttr(['meta[property=\\\"og:image\\\"]'],'content')||pickAttr(['img'],'src');" +
                 // 铁律5: shipping is a hidden cost — capture it so the user sees the real total.
                 "var ship='';try{var sm=body.match(/包邮|免运费|运费\\s*[¥￥]?\\s*[0-9]+(?:\\.[0-9]{1,2})?|快递\\s*[¥￥]?\\s*[0-9]+(?:\\.[0-9]{1,2})?|不包邮|偏远地区/);ship=sm?sm[0]:'';}catch(err){}" +
-                "var diag={platform:platform,host:host,href:location.href,titleText:document.title,bodyLength:body.length,priceNodeCount:document.querySelectorAll('[class*=price],[class*=Price]').length,imgCount:document.images.length,sample:body.slice(0,900)};" +
+                "var diag={platform:platform,host:host,href:location.href,titleText:document.title,bodyLength:(document.body.innerText||'').length,priceNodeCount:document.querySelectorAll('[class*=price],[class*=Price]').length,imgCount:document.images.length,sample:body.slice(0,900)};" +
                 "var data={platform:platform,host:host,title:title,price:price,promoPrice:promo,spec:spec,shop:shop,image:image,ship:ship,url:location.href,time:new Date().toISOString(),ua:navigator.userAgent,diagnoseOnly:" + diagnoseOnly + ",diag:diag};" +
                 "JiabibiBridge.onCapture(JSON.stringify(data));" +
                 "})();";
