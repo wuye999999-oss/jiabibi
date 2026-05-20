@@ -248,10 +248,22 @@ public class MainActivity extends Activity {
         return String.format(java.util.Locale.US, "%.2f", n);
     }
 
-    private double extractLowestPrice(String text) {
+    private double extractMoney(String text) {
         if (text == null) return 0;
-        Matcher m = Pattern.compile("([0-9]+(?:\\.[0-9]{1,2})?)").matcher(text);
+        // Drop installment noise ("¥25/期", "12期") so it can't masquerade as the price.
+        String cleaned = text.replaceAll("[¥￥]?\\s*[0-9]+(?:\\.[0-9]{1,2})?\\s*(?:元)?\\s*(?:/\\s*期|/\\s*月|期免息|期)", " ");
+        // Prefer ¥/￥-prefixed amounts — a bare "满300减50" then yields nothing.
+        Matcher pm = Pattern.compile("[¥￥]\\s*([0-9]+(?:\\.[0-9]{1,2})?)").matcher(cleaned);
         double best = Double.MAX_VALUE;
+        while (pm.find()) {
+            try {
+                double v = Double.parseDouble(pm.group(1));
+                if (v > 0.01 && v < best) best = v;
+            } catch (Exception ignored) {}
+        }
+        if (best != Double.MAX_VALUE) return best;
+        // No ¥-prefixed amount — fall back to the lowest bare number.
+        Matcher m = Pattern.compile("([0-9]+(?:\\.[0-9]{1,2})?)").matcher(cleaned);
         while (m.find()) {
             try {
                 double v = Double.parseDouble(m.group(1));
@@ -263,9 +275,16 @@ public class MainActivity extends Activity {
 
     private void upsertCapture(JSONObject o) {
         String p = o.optString("platform");
-        double a = extractLowestPrice(o.optString("promoPrice"));
-        double b = extractLowestPrice(o.optString("price"));
-        double priceNumber = a > 0 ? a : b;
+        double promoPrice = extractMoney(o.optString("promoPrice"));
+        double listPrice = extractMoney(o.optString("price"));
+        // Trust the promo price only when it's a plausible final price: not above
+        // the list price, and not implausibly low (a leftover discount amount).
+        double priceNumber;
+        if (promoPrice > 0 && (listPrice <= 0 || (promoPrice <= listPrice && promoPrice >= listPrice * 0.2))) {
+            priceNumber = promoPrice;
+        } else {
+            priceNumber = listPrice > 0 ? listPrice : promoPrice;
+        }
         try { o.put("priceNumber", priceNumber); } catch (Exception ignored) {}
         for (int i = captures.length() - 1; i >= 0; i--) {
             JSONObject old = captures.optJSONObject(i);
@@ -294,7 +313,9 @@ public class MainActivity extends Activity {
                 "var title=pick(platform==='jd'?jdTitle:(platform==='taobao'?tbTitle:(platform==='pdd'?pddTitle:commonTitle)))||meta('og:title')||document.title;" +
                 "var price=pick(priceSel);var body=document.body.innerText||'';if(!price||price.length>80)price=money(body)||price;" +
                 "var promo=pick(['[class*=coupon]','[class*=Coupon]','[class*=promo]','[class*=Promo]','[class*=activity]','[class*=Activity]']);" +
-                "if(!promo){var pm=body.match(/(?:券后|到手|满减|优惠|补贴|立减)[^\\n]{0,40}[¥￥]?[0-9]+(?:\\.[0-9]{1,2})?/);promo=pm?pm[0]:'';}" +
+                // Only trust 券后价/到手价/秒杀价 — these precede a real FINAL price.
+                // 满减/立减/优惠 describe discount *rules* ("满300减50"), not a final price.
+                "if(!promo){var pm=body.match(/(?:券后价?|到手价?|秒杀价)\\s*[:：]?\\s*[¥￥]?\\s*[0-9]+(?:\\.[0-9]{1,2})?/);promo=pm?pm[0]:'';}" +
                 "var spec=pick(['[class*=sku]','[class*=Sku]','[class*=spec]','[class*=Spec]','[class*=selected]']);" +
                 "var shop=pick(['.shop-name','.seller-name','.shop-title','.mall-name','.store-name','[class*=shop]','[class*=Shop]','[class*=seller]','[class*=Seller]']);" +
                 "var image=pickAttr(['meta[property=\\\"og:image\\\"]'],'content')||pickAttr(['img'],'src');" +
