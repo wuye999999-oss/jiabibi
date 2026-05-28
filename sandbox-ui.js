@@ -15,6 +15,9 @@
     expired: '已过期', closed: '已关闭', done: '已完成',
   };
 
+  let sandboxAvailable = null; // null=unknown, true=available, false=disabled(501)
+  let quickSearchController = null; // AbortController for in-flight quick-search
+
   let state = {
     sessionId: null,
     keyword: '',
@@ -71,6 +74,12 @@
       const statusEl = el('sb-session-status');
       if (statusEl) statusEl.textContent = `会话状态：${STATUS_LABELS[d.status] || d.status} · 过期时间：${d.expiresAt ? new Date(d.expiresAt).toLocaleTimeString() : '未知'}`;
       if (['expired', 'closed'].includes(d.status)) stopPolling();
+      // Auto-refresh screenshot when the current platform needs user attention
+      // (login page / captcha) — the user can see what the browser shows without clicking.
+      const curSt = (state.platformStatuses[state.currentPlatform] || {}).status;
+      if (['need_user_login', 'need_user_action', 'searching'].includes(curSt)) {
+        loadScreenshot(state.currentPlatform);
+      }
     } catch (_) {}
   }
 
@@ -128,6 +137,12 @@
         const badge = el('sb-result-badge');
         if (badge) { badge.textContent = d.total + '条结果'; badge.style.display = 'inline-block'; }
         mergeAndRefreshDisplay();
+      } else {
+        const blocked = Object.values(d.platforms || {}).some(p => p && ['need_user_action', 'need_user_login'].includes(p.status));
+        const statusEl = el('sb-session-status');
+        if (statusEl && blocked) {
+          statusEl.textContent = '部分平台需要登录或人工通过验证码。请切到对应平台标签，在下方截图里完成登录/验证，然后再次点「开始搜索」。';
+        }
       }
       await loadScreenshot(state.currentPlatform);
     } catch (e) {
@@ -163,17 +178,57 @@
   }
 
   function mergeAndRefreshDisplay() {
-    if (!window.renderAll || !window.lastApiData || !state.sandboxItems.length) return;
+    if (!window.renderAll || !state.sandboxItems.length) return;
     const sandboxConverted = state.sandboxItems
       .filter(item => (item.confidence || 0) >= 0.65)
       .map(sandboxToApiFormat);
     if (!sandboxConverted.length) return;
+    const base = window.lastApiData || { goods_list: [], total_count: 0 };
     const merged = {
-      ...window.lastApiData,
-      goods_list: [...(window.lastApiData.goods_list || []), ...sandboxConverted],
-      total_count: (window.lastApiData.goods_list || []).length + sandboxConverted.length,
+      ...base,
+      goods_list: [...(base.goods_list || []), ...sandboxConverted],
+      total_count: (base.goods_list || []).length + sandboxConverted.length,
     };
     window.renderAll(merged, window.lastQ || state.keyword);
+  }
+
+  async function quickSearch(keyword) {
+    const q = String(keyword || '').trim();
+    if (!q) return null;
+    if (sandboxAvailable === false) return null; // skip if already known disabled
+    // Abort any in-flight request for a previous keyword to prevent stale results.
+    if (quickSearchController) { quickSearchController.abort(); quickSearchController = null; }
+    const ctrl = new AbortController();
+    quickSearchController = ctrl;
+    state.keyword = q;
+    // Timeout: cold Render start (~50s) + 3-platform sequential search (~75s) = 125s max.
+    // Cap at 90s so we fail fast rather than hanging indefinitely.
+    const timeoutId = setTimeout(() => ctrl.abort(), 90000);
+    try {
+      const r = await fetch(`${API}/api/sandbox/quick-search`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: q, platforms: ['jd', 'pdd', 'taobao'] }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timeoutId);
+      if (r.status === 501) { sandboxAvailable = false; return null; } // sandbox disabled — cache and skip
+      if (r.status === 429) return null; // server busy — silent, don't cache
+      sandboxAvailable = true;
+      const d = await r.json();
+      if (!d.ok || !d.results || !d.results.length) return d;
+      state.sandboxItems = d.results;
+      const badge = el('sb-result-badge');
+      if (badge) { badge.textContent = d.total + '条验价结果'; badge.style.display = 'inline-block'; }
+      mergeAndRefreshDisplay();
+      return d;
+    } catch (e) {
+      clearTimeout(timeoutId);
+      if (e && e.name === 'AbortError') return null; // silently cancelled by newer search or 90s timeout
+      return null;
+    } finally {
+      if (quickSearchController === ctrl) quickSearchController = null;
+    }
   }
 
   async function close() {
@@ -190,8 +245,9 @@
     state.sandboxItems = [];
     const badge = el('sb-result-badge');
     if (badge) badge.style.display = 'none';
-    if (window.renderAll && window.lastApiData) {
-      window.renderAll(window.lastApiData, window.lastQ || state.keyword);
+    if (window.renderAll) {
+      const base = window.lastApiData || { goods_list: [], total_count: 0 };
+      window.renderAll(base, window.lastQ || state.keyword);
     }
   }
 
@@ -216,12 +272,12 @@
     state.closed = false;
     state.sandboxItems = [];
     const ok = await createSession();
-    if (ok) showPanel();
+    if (ok) { showPanel(); runSearch(); }
   }
 
   function cancelConsent() {
     el('consent-modal').classList.remove('show');
   }
 
-  window.SandboxUI = { open: openConsentModal, confirmStart, cancelConsent, close, runSearch, switchPlatform, refreshScreenshot };
+  window.SandboxUI = { open: openConsentModal, confirmStart, cancelConsent, close, runSearch, switchPlatform, refreshScreenshot, quickSearch };
 })();
