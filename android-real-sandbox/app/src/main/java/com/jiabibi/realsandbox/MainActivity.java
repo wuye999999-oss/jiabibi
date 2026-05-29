@@ -84,7 +84,7 @@ public class MainActivity extends Activity {
         root.addView(actions, new LinearLayout.LayoutParams(-1, -2));
 
         result = new TextView(this);
-        result.setText("四平台：淘宝/京东/拼多多/抖音 → 进商品页 → 读取价格。\n自动算单位价(¥/kg、¥/L…)，显示运费，四平台对比。\n长按：标题=清登录态；读取价格=诊断；买最低价=复制JSON；结果区=清空。\n复制结果=复制文字对比结果。\n");
+        result.setText("四平台：淘宝/京东/拼多多/抖音 → 进商品页 → 读取价格。\n自动算单位价(¥/kg、¥/L…)，显示运费，四平台对比。\n抖音：进haohuo商品详情页，点读取价格（自动等React加载）。\n长按：标题=清登录态；读取价格=诊断；买最低价=复制JSON；结果区=清空。\n");
         result.setTextSize(13);
         result.setPadding(0, 8, 0, 8);
         result.setOnLongClickListener(v -> { clearResults(); return true; });
@@ -101,15 +101,15 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setSupportZoom(true);
         s.setBuiltInZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + " JiabibiRealSandbox/0.5");
+        s.setUserAgentString(s.getUserAgentString() + “ JiabibiRealSandbox/0.8”);
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                lastUrl = url == null ? "" : url;
+                lastUrl = url == null ? “” : url;
                 lastPlatform = detectPlatform(lastUrl);
-                lastPageTitle = view == null ? "" : String.valueOf(view.getTitle());
-                runOnUiThread(() -> updateStatus("已打开：" + platformName(lastPlatform) + "\n" + shortText(lastPageTitle, 40) + "\n进商品页后点“读取价格”。"));
+                lastPageTitle = view == null ? “” : String.valueOf(view.getTitle());
+                runOnUiThread(() -> updateStatus(“已打开：” + platformName(lastPlatform) + “\n” + shortText(lastPageTitle, 40) + “\n进商品页后点”读取价格”。”));
             }
         });
         webView.setWebChromeClient(new WebChromeClient());
@@ -156,7 +156,7 @@ public class MainActivity extends Activity {
             String url;
             if ("tb".equals(platform)) url = "https://s.m.taobao.com/h5?q=" + e;
             else if ("pdd".equals(platform)) url = "https://mobile.yangkeduo.com/search_result.html?search_key=" + e;
-            else if ("douyin".equals(platform)) url = "https://haohuo.jinritemai.com/views/product/list?search_text=" + e;
+            else if ("douyin".equals(platform)) url = "https://haohuo.jinritemai.com/views/product/list?search_text=" + e + "&tab=0";
             else url = "https://m.jd.com/ware/search.action?keyword=" + e;
             openUrl(url);
         } catch (Exception ex) {
@@ -389,23 +389,34 @@ public class MainActivity extends Activity {
         return "(function(){" +
                 "function text(x){return (x&&x.innerText||x&&x.textContent||'').trim().replace(/\\s+/g,' ')}" +
                 "function pick(sel){for(var i=0;i<sel.length;i++){try{var e=document.querySelector(sel[i]);var t=text(e);if(t&&t.length>0)return t}catch(err){}}return ''}" +
+                "function pickAll(sel){var out=[];document.querySelectorAll(sel).forEach(function(e){var t=text(e);if(t&&t.length>0&&t.length<100)out.push(t);});return out;}" +
                 "function pickAttr(sel,attr){for(var i=0;i<sel.length;i++){try{var e=document.querySelector(sel[i]);var v=e&&e.getAttribute(attr);if(v)return v}catch(err){}}return ''}" +
                 "function meta(name){var e=document.querySelector('meta[property=\\\"'+name+'\\\"],meta[name=\\\"'+name+'\\\"]');return e?e.getAttribute('content')||'':''}" +
                 "function money(s){s=String(s||'');var m=s.match(/(?:到手价|券后价|券后|秒杀价|活动价|预估|价格|¥|￥)\\s*[:：]?\\s*[¥￥]?\\s*([0-9]+(?:\\.[0-9]{1,2})?)/);if(m)return m[0];var m2=s.match(/[¥￥]\\s*([0-9]+(?:\\.[0-9]{1,2})?)/);return m2?m2[0]:''}" +
+                // Extract JSON-LD Product structured data — reliable when present
+                "function extractJsonLd(){try{var tags=document.querySelectorAll('script[type=\\\"application/ld+json\\\"]');for(var i=0;i<tags.length;i++){try{var d=JSON.parse(tags[i].textContent||tags[i].innerText||'');var arr=Array.isArray(d)?d:[d];for(var j=0;j<arr.length;j++){var o=arr[j];if(o&&(o['@type']==='Product'||o.offers)){var pr=o.offers&&(o.offers.price||o.offers.lowPrice);var nm=o.name||'';return{name:String(nm),price:pr?'¥'+pr:''};}}}}catch(e){}}return null;}" +
+                // Extract from Douyin/Haohuo window state — prices often buried in JS state
+                "function extractDyState(){try{var keys=['__INITIAL_STATE__','__pinia','__NUXT_DATA__','__ROUTE_STATE__'];for(var k=0;k<keys.length;k++){if(!window[keys[k]])continue;var s=JSON.stringify(window[keys[k]]);var m=s.match(/[\"'](?:price|salePrice|currentPrice|activityPrice)[\"']:\\s*[\"']?([0-9]+(?:\\.[0-9]{1,2})?)[\"']?/i);if(m&&parseFloat(m[1])>0){var v=parseFloat(m[1]);return v>=100&&Number.isInteger(v)?'¥'+(v/100).toFixed(2):'¥'+v;}}}catch(e){}return '';}" +
                 "var host=location.hostname.toLowerCase();" +
                 "var platform=host.indexOf('taobao')>-1||host.indexOf('tmall')>-1?'taobao':(host.indexOf('jd.com')>-1||host.indexOf('3.cn')>-1?'jd':(host.indexOf('yangkeduo')>-1||host.indexOf('pinduoduo')>-1?'pdd':(host.indexOf('douyin')>-1||host.indexOf('jinritemai')>-1||host.indexOf('tiktok')>-1?'douyin':'unknown')));" +
                 "var commonTitle=['#goods_name','.sku-name','.goods-name','.goods-title','.title','.item-title','.tb-main-title','h1'];" +
                 "var jdTitle=['.sku-name','#itemName','.prod-title','.good-detail-title','.item-title','h1'];" +
                 "var tbTitle=['.tb-main-title','.module-title','.item-title','.rax-view-v2','h1'];" +
                 "var pddTitle=['[class*=goodsName]','[class*=goods-name]','[class*=title]','h1'];" +
-                "var dyTitle=['[class*=title]','[class*=goods-name]','[class*=productName]','[class*=product-name]','h1'];" +
+                "var dyTitle=['[class*=productName]','[class*=product-name]','[class*=goods-name]','[class*=goodsName]','[class*=itemName]','[class*=item-name]','[class*=title]','h1'];" +
                 "var priceSel=['.price','.price-current','.real-price','.tm-price','.tb-rmb-num','.jd-price','.p-price','.price_wrap','[class*=Price]','[class*=price]'];" +
                 "if(platform==='jd')priceSel=['.jd-price','.price','.p-price','[class*=price]','[class*=Price]'];" +
                 "if(platform==='taobao')priceSel=['.tm-price','.tb-rmb-num','.price','.real-price','[class*=price]','[class*=Price]'];" +
                 "if(platform==='pdd')priceSel=['[class*=price]','[class*=Price]','.price','.goods-price'];" +
-                "if(platform==='douyin')priceSel=['[class*=price]','[class*=Price]','[class*=amount]','[class*=Amount]','.price'];" +
+                // Douyin/Haohuo: try specific selectors first, then generic amount/price
+                "if(platform==='douyin')priceSel=['[class*=salePrice]','[class*=sale-price]','[class*=realPrice]','[class*=real-price]','[class*=currentPrice]','[class*=current-price]','[class*=activityPrice]','[class*=activity-price]','[class*=price]','[class*=Price]','[class*=amount]','[class*=Amount]','.price'];" +
                 "var title=pick(platform==='jd'?jdTitle:(platform==='taobao'?tbTitle:(platform==='pdd'?pddTitle:(platform==='douyin'?dyTitle:commonTitle))))||meta('og:title')||document.title;" +
-                "var price=pick(priceSel);var body=(document.body.innerText||'').slice(0,4000);if(!price||price.length>80)price=money(body)||price;" +
+                "var price=pick(priceSel);var body=(document.body.innerText||'').slice(0,5000);if(!price||price.length>80)price=money(body)||price;" +
+                // Supplement with JSON-LD and window state for Douyin/unknown
+                "var jld=extractJsonLd();" +
+                "if(jld&&jld.price&&(!price||price.length>80))price=jld.price;" +
+                "if(jld&&jld.name&&(!title||title===document.title))title=jld.name;" +
+                "if(platform==='douyin'&&(!price||price.length>80)){var dys=extractDyState();if(dys)price=dys;}" +
                 "var promo=pick(['[class*=coupon]','[class*=Coupon]','[class*=promo]','[class*=Promo]','[class*=activity]','[class*=Activity]']);" +
                 // Only trust 券后价/到手价/秒杀价 — these precede a real FINAL price.
                 // 满减/立减/优惠 describe discount *rules* ("满300减50"), not a final price.
@@ -415,20 +426,39 @@ public class MainActivity extends Activity {
                 "var image=pickAttr(['meta[property=\\\"og:image\\\"]'],'content')||pickAttr(['img'],'src');" +
                 // 铁律5: shipping is a hidden cost — capture it so the user sees the real total.
                 "var ship='';try{var sm=body.match(/包邮|免运费|运费\\s*[¥￥]?\\s*[0-9]+(?:\\.[0-9]{1,2})?|快递\\s*[¥￥]?\\s*[0-9]+(?:\\.[0-9]{1,2})?|不包邮|偏远地区/);ship=sm?sm[0]:'';}catch(err){}" +
-                "var diag={platform:platform,host:host,href:location.href,titleText:document.title,bodyLength:(document.body.innerText||'').length,priceNodeCount:document.querySelectorAll('[class*=price],[class*=Price]').length,imgCount:document.images.length,sample:body.slice(0,900)};" +
+                "var priceCandidates=pickAll('[class*=price],[class*=Price],[class*=amount],[class*=Amount]').slice(0,12);" +
+                "var diag={platform:platform,host:host,href:location.href,titleText:document.title,bodyLength:(document.body.innerText||'').length,priceNodeCount:document.querySelectorAll('[class*=price],[class*=Price]').length,imgCount:document.images.length,hasJsonLd:!!jld,priceCandidates:priceCandidates,sample:body.slice(0,900)};" +
                 "var data={platform:platform,host:host,title:title,price:price,promoPrice:promo,spec:spec,shop:shop,image:image,ship:ship,url:location.href,time:new Date().toISOString(),ua:navigator.userAgent,diagnoseOnly:" + diagnoseOnly + ",diag:diag};" +
                 "JiabibiBridge.onCapture(JSON.stringify(data));" +
                 "})();";
     }
 
-    private void capturePrice() { webView.evaluateJavascript(captureScript(false), null); }
+    private void capturePrice() {
+        // Douyin pages are React SPAs — inject after a brief wait if the body looks empty
+        if ("douyin".equals(lastPlatform)) {
+            updateStatus("抖音页面加载中，稍等片刻…");
+            webView.evaluateJavascript(
+                "(function(){return (document.body&&document.body.innerText||'').length;})()",
+                bodyLen -> {
+                    int len = 0;
+                    try { len = Integer.parseInt(bodyLen.trim()); } catch (Exception ignored) {}
+                    int finalLen = len;
+                    // If page body is mostly empty, wait 1.5s for React to render
+                    long delay = finalLen < 500 ? 1500 : 0;
+                    webView.postDelayed(() -> webView.evaluateJavascript(captureScript(false), null), delay);
+                }
+            );
+        } else {
+            webView.evaluateJavascript(captureScript(false), null);
+        }
+    }
     private void diagnosePage() { webView.evaluateJavascript(captureScript(true), null); }
 
     private JSONObject buildExportObject() {
         JSONObject out = new JSONObject();
         try {
             out.put("app", "jiabibi-real-sandbox");
-            out.put("version", "v7-douyin");
+            out.put("version", "v8-douyin-sandbox");
             out.put("principle", "user wants the cheapest real observed UNIT price (¥/unit + shipping) and a direct path to buy; local WebView only; no fake price; no cookie upload");
             out.put("lastPlatform", lastPlatform);
             out.put("lastUrl", lastUrl);
