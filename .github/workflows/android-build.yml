@@ -1,0 +1,56 @@
+name: Build Android Sandbox APK
+
+# 云端自动编译价比比沙盒 APK。
+# 每次推送到开发分支都会生成一个可直接安装的 debug APK，
+# 在 Actions 运行结果的 Artifacts 里下载，拖进模拟器或真机即可安装。
+# 这样就不用在本地 Android Studio 里手动编译。
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+      - main
+    paths:
+      - 'android-real-sandbox/**'
+      - '.github/workflows/android-build.yml'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-real-sandbox
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK platform & build-tools
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jiabibi-sandbox-debug-apk
+          path: android-real-sandbox/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error

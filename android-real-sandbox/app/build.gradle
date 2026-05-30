@@ -11,4 +11,10 @@ android {
         versionCode 1
         versionName '0.1.0'
     }
+
+    compileOptions {
+        encoding = "UTF-8"
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
 }
