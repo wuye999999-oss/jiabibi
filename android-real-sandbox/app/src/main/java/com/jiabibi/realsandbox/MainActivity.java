@@ -101,15 +101,15 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setSupportZoom(true);
         s.setBuiltInZoomControls(false);
-        s.setUserAgentString(s.getUserAgentString() + “ JiabibiRealSandbox/0.8”);
+        s.setUserAgentString(s.getUserAgentString() + " JiabibiRealSandbox/0.8");
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                lastUrl = url == null ? “” : url;
+                lastUrl = url == null ? "" : url;
                 lastPlatform = detectPlatform(lastUrl);
-                lastPageTitle = view == null ? “” : String.valueOf(view.getTitle());
-                runOnUiThread(() -> updateStatus(“已打开：” + platformName(lastPlatform) + “\n” + shortText(lastPageTitle, 40) + “\n进商品页后点”读取价格”。”));
+                lastPageTitle = view == null ? "" : String.valueOf(view.getTitle());
+                runOnUiThread(() -> updateStatus("已打开：" + platformName(lastPlatform) + "\n" + shortText(lastPageTitle, 40) + "\n进商品页后点「读取价格」。"));
             }
         });
         webView.setWebChromeClient(new WebChromeClient());
@@ -516,15 +516,15 @@ public class MainActivity extends Activity {
                     lastDiag = diag == null ? "" : diag.toString();
                     boolean diagnoseOnly = o.optBoolean("diagnoseOnly", false);
                     if (!diagnoseOnly) upsertCapture(o);
-                    if (diagnoseOnly) updateStatus(“诊断完成。长按”买最低价”复制 JSON。\n价格节点：” + (diag == null ? “” : diag.optString(“priceNodeCount”)));
+                    if (diagnoseOnly) updateStatus("诊断完成。长按「买最低价」复制 JSON。\n价格节点：" + (diag == null ? "" : diag.optString("priceNodeCount")));
                     else {
-                        String platform = o.optString(“platform”);
-                        String unitT = o.optString(“unitText”);
-                        String ship = o.optString(“ship”);
-                        String extra = (unitT.length() > 0 ? “\n单价：” + unitT : “”)
-                                     + (ship.length() > 0 ? “\n运费：” + ship : “”);
-                        String unknownNote = “unknown”.equals(platform) ? “\n注：当前页面不是支持的平台，价格仅供参考。” : “”;
-                        updateStatus(“读取成功：” + platformName(platform) + “  “ + o.optString(“price”) + extra + unknownNote + “\n继续切平台读取，最后点买最低价。”);
+                        String platform = o.optString("platform");
+                        String unitT = o.optString("unitText");
+                        String ship = o.optString("ship");
+                        String extra = (unitT.length() > 0 ? "\n单价：" + unitT : "")
+                                     + (ship.length() > 0 ? "\n运费：" + ship : "");
+                        String unknownNote = "unknown".equals(platform) ? "\n注：当前页面不是支持的平台，价格仅供参考。" : "";
+                        updateStatus("读取成功：" + platformName(platform) + "  " + o.optString("price") + extra + unknownNote + "\n继续切平台读取，最后点买最低价。");
                     }
                 } catch (Exception e) {
                     updateStatus("读取失败：" + e.getMessage());
